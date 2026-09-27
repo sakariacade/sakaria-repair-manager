@@ -26,19 +26,27 @@ const playSound = (() => {
   const play = (notes, type = 'sine', gainVal = 0.18) => {
     try {
       const ac = getCtx();
-      notes.forEach(([freq, start, dur]) => {
-        const osc = ac.createOscillator();
-        const gain = ac.createGain();
-        osc.connect(gain);
-        gain.connect(ac.destination);
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, ac.currentTime + start);
-        gain.gain.setValueAtTime(0, ac.currentTime + start);
-        gain.gain.linearRampToValueAtTime(gainVal, ac.currentTime + start + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + start + dur);
-        osc.start(ac.currentTime + start);
-        osc.stop(ac.currentTime + start + dur + 0.05);
-      });
+      // Resume AudioContext if browser suspended it (autoplay policy fix)
+      const doPlay = () => {
+        notes.forEach(([freq, start, dur]) => {
+          const osc = ac.createOscillator();
+          const gain = ac.createGain();
+          osc.connect(gain);
+          gain.connect(ac.destination);
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, ac.currentTime + start);
+          gain.gain.setValueAtTime(0, ac.currentTime + start);
+          gain.gain.linearRampToValueAtTime(gainVal, ac.currentTime + start + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + start + dur);
+          osc.start(ac.currentTime + start);
+          osc.stop(ac.currentTime + start + dur + 0.05);
+        });
+      };
+      if (ac.state === 'suspended') {
+        ac.resume().then(doPlay);
+      } else {
+        doPlay();
+      }
     } catch (e) { /* silent fail */ }
   };
   return {
