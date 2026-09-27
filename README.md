@@ -1,61 +1,35 @@
-# 🔧 Sakaria Repair Manager ⭐
-### Computer & Laptop Repair Management System (Nidaamka Maamulka Dayactirka Kombiyuutarada)
+# 🔧 Sakaria Repair Manager ⭐ (React Edition)
+### Professional Computer & Laptop Repair Management System
+
+Built with **React 18**, **Vite**, **Tailwind CSS**, **Lucide Icons**, and **Chart.js**.
 
 ---
 
-## 🇸🇴 Faahfaahinta Af-Soomaaliga
+## 🇸🇴 Tilmaamaha Af-Soomaaliga
 
-**Sakaria Repair Manager** waa barnaamij casri ah oo loogu talagalay goobaha dayactirka kombiyuutarada iyo laptop-yada. Wuxuu si fudud kuugu sahlayaa maamulka macaamiisha, tikidhada qalabka, xisaabaadka lacagaha, soo saarista qaansheegadka (PDF Invoice), iyo la socodka xaaladaha dayactirka.
+Barnaamijkan waa nidaam dhammaystiran oo loogu talagalay maamulka xarumaha ciladbixinta kombiyuutarada iyo laptop-yada.
 
-### 🌟 Astaamaha Muhiimka ah (Key Features):
-1. **Diiwaanka Macaamiisha (Customer Records):**
-   - Raadi macmiil kasta magaciisa ama taleefankiisa.
-   - Eeg dhammaan qalabka macmiilku keenay, wadarta uu bixiyay, iyo deynta ku dhiman.
-2. **Tikidhada Dayactirka (Repair Tickets):**
-   - Nooca qalabka (Laptop, Desktop PC, MacBook, All-in-One, Monitor, iwm).
-   - Shirkadda & Nooca (Brand & Model), Serial Number, Password/PIN, iyo Qalabka la socda (Charger, Bag).
-   - Ciladda macmiilku sheegay & Baaritaanka farsamoyaqaanka.
-3. **Tubta Xaaladaha (Status Workflow Pipeline):**
-   - `Received` (1. La Helay / Qabasho)
-   - `Repairing` (2. Dayactir Socda / Ciladbixin)
-   - `Ready` (3. Diyaar Ah / Waaxday)
-   - `Delivered` (4. La Wareejiyay / Macmiilku Qaatay)
-   - Waxaad ku daawan kartaa hab **Liis (Table View)** ama hab **Pipeline (Kanban Board)**.
-4. **Qiimaha iyo Lacagta (Pricing & Payments):**
-   - Xisaabinta shaqada farsamada (Labor Cost).
-   - Qalabka la bedelay (Spare Parts Cost).
-   - Qiimo dhimis (Discount).
-   - Xisaabinta tooska ah ee Wadarta Guud, La Bixiyay, iyo Haraaga Dhiman.
-   - Hababka lacag bixinta: Zaad Service, EVC Plus, E-Dahab, Cash, iyo Kaar.
-5. **Qaansheegadka PDF & Rasiidka (PDF Invoice & Receipt):**
-   - Hal gujin ku daabac (Print) ama ku soo degso PDF tayo sare leh (High Resolution A4).
-   - Farriin toos ah ugu dir macmiilka WhatsApp-kiisa oo wadata xaaladda qalabka iyo xisaabta.
-6. **Dashboodh & Tirokoob (Dashboard & Statistics):**
-   - Shaxanka xaaladaha (Doughnut Chart) iyo shirkadaha kombiyuutarada ugu badan (Bar Chart).
-   - Kormeerka dakhliga la qabtay iyo deynta dhiman.
-7. **Luqadaha & Habka Habaynta (Bilingual & Dark Mode):**
-   - Hal riix ku kala bedel Af-Soomaali 🇸🇴 iyo English 🇬🇧.
-   - Habka habeenka (Dark Mode) iyo habka maalinta (Light Mode).
-   - Ka kobo xogta (JSON Backup & Restore) si aysan xogtu kuugu lumin.
-
----
-
-## 🇬🇧 English Overview
-
-**Sakaria Repair Manager** is a dedicated repair shop ERP and management web application built for PC, Mac, and laptop repair professionals.
-
-### How to Run:
-No installation, Node.js, or server required! You can open it directly in any web browser:
-1. Double-click or open `index.html` in Microsoft Edge, Google Chrome, Brave, or Firefox.
-2. Or run via PowerShell:
-   ```powershell
-   Start-Process "C:\Users\hp\.gemini\antigravity\scratch\sakaria-repair-manager\index.html"
+### 🚀 Sida Loogu Kiciyo Kombiyuutarkaaga (How to Run):
+Waxaan kombiyuutarkaaga ku rakibnay **Node.js LTS** iyo **NPM**.
+Si aad u furto barnaamijka:
+1. Fur PowerShell ama Terminal galka mashruuca:
+   ```bash
+   cd C:\Users\hp\.gemini\antigravity\scratch\sakaria-repair-manager
    ```
+2. Ku dhufo:
+   ```bash
+   npm run dev
+   ```
+3. Wuxuu si toos ah browser-kaaga ugu furayaa: `http://localhost:3000`
 
 ---
 
-## 📁 File Structure
-- `index.html`: Responsive single-page application with accessible modal dialogues, dashboard, ticket pipeline, and invoice viewer.
-- `style.css`: Tailwind styling, theme controls, print media stylesheet for crisp PDF receipts.
-- `app.js`: State manager, calculations, bilingual dictionary, Chart.js integrations, WhatsApp notifications, and LocalStorage engine.
-- `README.md`: Documentation and quick guide.
+## 🌟 Astaamaha Barnaamijka:
+- 💻 **Computer/Laptop Repair**: Diiwaangelinta Laptop, Desktop PC, MacBook, All-in-One, Serial Number, Accessories, Password.
+- 👥 **Customer Records**: Diiwaanka macaamiisha, xisaabinta dakhliga uu soo galiyay iyo deynta lagu leeyahay.
+- 🔄 **Status Workflow**: `Received` → `Repairing` → `Ready` → `Delivered` (Table View & Kanban Pipeline).
+- 💰 **Qiimaha iyo Lacagta**: Labor + Parts - Discount = Total, lacagaha la bixiyay iyo haraaga dhiman.
+- 📄 **PDF Invoice & Printing**: Qaansheegad A4 oo rasmi ah, dammaanad (warranty), iyo saxeexyada farsamoyaqaanka.
+- 💬 **WhatsApp Notification**: Farriin toos ah oo hal-gujis ah oo loogu dirayo WhatsApp-ka macmiilka.
+- 📊 **Dashboard & Statistics**: Shaxanno Chart.js ah oo muujinaya xaaladaha iyo noocyada kombiyuutarada (HP, Dell, Apple, Lenovo).
+- 🌐 **Bilingual**: Af-Soomaali 🇸🇴 iyo English 🇬🇧.
