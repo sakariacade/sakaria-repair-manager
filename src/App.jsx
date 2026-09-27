@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Wrench, PlusCircle, Search, Moon, Sun, Settings, Download, Upload, 
+  Wrench, PlusCircle, Search, Moon, Sun, Settings, Download, 
   RefreshCw, LayoutDashboard, Users, DollarSign, Store, Layers, Inbox, 
   Cog, CheckCircle, PackageCheck, Banknote, Laptop, BellRing, Send, 
   Clock, ArrowRight, ArrowRightCircle, List, Kanban, MessageSquare, 
   FileText, Edit3, Trash2, Plus, Phone, UserPlus, Receipt, Save, X, Check, Printer,
-  Database
+  Database, Sparkles, ShieldCheck
 } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
@@ -17,7 +17,7 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
 export default function App() {
   // --- STATE ---
   const [lang, setLang] = useState(() => localStorage.getItem('sakaria_lang') || 'so');
-  const [theme, setTheme] = useState(() => localStorage.getItem('sakaria_theme') || 'light');
+  const [theme, setTheme] = useState(() => localStorage.getItem('sakaria_theme') || 'dark');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [ticketView, setTicketView] = useState('table'); // 'table' | 'kanban'
   const [dbConnected, setDbConnected] = useState(false);
@@ -80,12 +80,11 @@ export default function App() {
       .then(data => {
         if (data.success && data.tickets) {
           setTickets(data.tickets);
-          if (data.settings) setSettings(data.settings);
+          if (data.settings) setSettings({ ...data.settings, phone: "+252 61 1616691" });
           setDbConnected(true);
         }
       })
       .catch(() => {
-        console.log("Local server offline, falling back to LocalStorage.");
         setDbConnected(false);
       });
   }, []);
@@ -157,7 +156,6 @@ export default function App() {
       setTickets(prev => prev.map(item => item.id === ticketId ? updated : item));
       showToast(lang === 'so' ? `Xaaladda tikidhka ${tk.id} waa la gudbiyay: ${getStatusLabel(nextStatus)}` : `Ticket ${tk.id} status moved to: ${nextStatus}`, 'success');
 
-      // Sync with Real Database
       fetch('/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -171,13 +169,10 @@ export default function App() {
     if (window.confirm(confirmMsg)) {
       setTickets(prev => prev.filter(tk => tk.id !== ticketId));
       showToast(lang === 'so' ? 'Tikidhka waa la tirtiray' : 'Ticket deleted', 'info');
-
-      // Sync with Real Database
       fetch(`/api/tickets/${ticketId}`, { method: 'DELETE' }).catch(err => console.error("Database sync error:", err));
     }
   };
 
-  // Status & Payment Helpers
   const getStatusLabel = (status) => {
     if (lang === 'so') {
       switch(status) {
@@ -198,13 +193,19 @@ export default function App() {
     }
   };
 
+  // Refined pill badge styles
   const getStatusBadgeClass = (status) => {
     switch(status) {
-      case 'Received': return 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300';
-      case 'Repairing': return 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300';
-      case 'Ready': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300';
-      case 'Delivered': return 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300';
-      default: return 'bg-slate-100 text-slate-700';
+      case 'Received': 
+        return 'bg-sky-50 text-sky-700 border border-sky-200/80 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800/80 shadow-sm shadow-sky-500/10';
+      case 'Repairing': 
+        return 'bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/80 shadow-sm shadow-amber-500/10';
+      case 'Ready': 
+        return 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/80 shadow-sm shadow-emerald-500/10';
+      case 'Delivered': 
+        return 'bg-purple-50 text-purple-700 border border-purple-200/80 dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-800/80 shadow-sm shadow-purple-500/10';
+      default: 
+        return 'bg-slate-100 text-slate-700 border border-slate-200';
     }
   };
 
@@ -305,7 +306,7 @@ export default function App() {
     setIsTicketModalOpen(true);
   };
 
-  // Save Ticket Handler (Saves to Hard Drive Database!)
+  // Save Ticket Handler
   const handleSaveTicket = (e) => {
     e.preventDefault();
     const labor = parseFloat(formData.labor) || 0;
@@ -337,7 +338,7 @@ export default function App() {
       };
 
       setTickets(prev => prev.map(tk => tk.id === editingTicket.id ? targetTicket : tk));
-      showToast(lang === 'so' ? `Tikidhka ${editingTicket.id} waa la cusbooneysiiyay (Database-ka waa la keydiyay)` : `Ticket ${editingTicket.id} saved to Database`, 'success');
+      showToast(lang === 'so' ? `Tikidhka ${editingTicket.id} waa la keydiyay` : `Ticket ${editingTicket.id} saved`, 'success');
     } else {
       const maxNum = tickets.reduce((max, tk) => {
         const num = parseInt(tk.id.replace('SRM-', '')) || 1000;
@@ -365,10 +366,9 @@ export default function App() {
       };
 
       setTickets(prev => [targetTicket, ...prev]);
-      showToast(lang === 'so' ? `Tikidh cusub waa la diiwaangeliyay: ${newId} (Hard Drive Saved)` : `New ticket saved to Database: ${newId}`, 'success');
+      showToast(lang === 'so' ? `Tikidh cusub waa la keydiyay: ${newId}` : `New ticket saved: ${newId}`, 'success');
     }
 
-    // Save to Real Database File on Disk
     fetch('/api/tickets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -421,9 +421,9 @@ export default function App() {
     ],
     datasets: [{
       data: [stats.received, stats.repairing, stats.ready, stats.delivered],
-      backgroundColor: ['#38bdf8', '#fbbf24', '#34d399', '#c084fc'],
+      backgroundColor: ['#0ea5e9', '#f59e0b', '#10b981', '#8b5cf6'],
       borderWidth: 2,
-      borderColor: theme === 'dark' ? '#1e293b' : '#ffffff'
+      borderColor: theme === 'dark' ? '#0f172a' : '#ffffff'
     }]
   };
 
@@ -442,45 +442,47 @@ export default function App() {
       label: lang === 'so' ? 'Tirada' : 'Count',
       data: brandCounts.map(b => b[1]),
       backgroundColor: '#6366f1',
-      borderRadius: 6
+      borderRadius: 8
     }]
   };
 
-  // Form total & balance computation
   const formTotal = Math.max(0, (parseFloat(formData.labor) || 0) + (parseFloat(formData.parts) || 0) - (parseFloat(formData.discount) || 0));
   const formBalance = Math.max(0, formTotal - (parseFloat(formData.paid) || 0));
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 font-sans transition-colors duration-200">
       
-      {/* HEADER & TOPBAR */}
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30 shadow-sm">
+      {/* HEADER & TOPBAR (Glassmorphic) */}
+      <header className="bg-white/85 dark:bg-[#0f172a]/85 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 sticky top-0 z-30 shadow-sm shadow-slate-900/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             
             {/* Logo & Database Badge */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/30">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
                 <Wrench className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
+                  <h1 className="text-lg font-black tracking-tight bg-gradient-to-r from-blue-600 via-indigo-500 to-violet-600 dark:from-blue-400 dark:via-indigo-300 dark:to-violet-400 bg-clip-text text-transparent">
                     Sakaria Repair Manager
                   </h1>
-                  <span className="text-amber-500 text-sm">⭐</span>
+                  <span className="text-amber-400 text-sm">⭐</span>
                   
-                  {/* Real Database Indicator */}
-                  <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                  {/* Database Live Badge */}
+                  <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
                     dbConnected 
-                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' 
-                      : 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800' 
+                      : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800'
                   }`}>
-                    <Database className="w-3 h-3" />
-                    <span>{dbConnected ? 'Hard Drive DB' : 'Local DB'}</span>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span>{dbConnected ? 'Database Connected' : 'Local Storage'}</span>
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{t.subtitle}</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.subtitle}</p>
               </div>
             </div>
 
@@ -496,19 +498,19 @@ export default function App() {
                     if (e.target.value && activeTab !== 'tickets') setActiveTab('tickets');
                   }}
                   placeholder={lang === 'so' ? "Raadi macmiil, taleefan, tikidh (SRM-...), qalab..." : "Search customer, phone, ticket ID (SRM-...), device..."}
-                  className="w-full pl-9 pr-4 py-2 text-sm bg-slate-100 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                  className="w-full pl-9 pr-4 py-2 text-sm bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white transition"
                 />
               </div>
             </div>
 
             {/* Right Controls */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* WhatsApp Quick Link */}
+              {/* WhatsApp Quick Chat */}
               <a 
                 href="https://wa.me/252611616691" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition hover:scale-[1.02]"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl shadow-md shadow-emerald-500/20 transition hover:scale-[1.02] active:scale-95"
                 title="WhatsApp: +252 61 1616691"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
@@ -517,7 +519,7 @@ export default function App() {
 
               <button 
                 onClick={() => openNewTicketModal()}
-                className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm shadow-blue-500/20 transition hover:scale-[1.02] active:scale-95"
+                className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl shadow-md shadow-indigo-500/20 transition hover:scale-[1.02] active:scale-95"
               >
                 <PlusCircle className="w-4 h-4" />
                 <span className="hidden sm:inline">{t.newTicket}</span>
@@ -526,7 +528,7 @@ export default function App() {
               {/* Language Switcher */}
               <button 
                 onClick={() => setLang(l => l === 'so' ? 'en' : 'so')}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition"
                 title="Switch Language"
               >
                 <span>{lang === 'so' ? '🇸🇴' : '🇬🇧'}</span>
@@ -536,33 +538,33 @@ export default function App() {
               {/* Dark / Light Toggle */}
               <button 
                 onClick={() => setTheme(th => th === 'dark' ? 'light' : 'dark')}
-                className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
                 title="Toggle Theme"
               >
-                {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+                {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
               </button>
 
               {/* Backup / Settings Menu */}
               <div className="relative">
                 <button 
                   onClick={() => setIsSettingsMenuOpen(!isSettingsMenuOpen)}
-                  className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                  className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
                 >
                   <Settings className="w-4 h-4" />
                 </button>
                 {isSettingsMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm z-50 animate-scale-up">
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-1 text-sm z-50 animate-scale-up">
                     <button 
                       onClick={() => { exportBackup(); setIsSettingsMenuOpen(false); }}
                       className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
                     >
-                      <Download className="w-4 h-4 text-blue-500" />
+                      <Download className="w-4 h-4 text-indigo-500" />
                       <span>{t.exportBackup}</span>
                     </button>
                     <div className="border-t border-slate-100 dark:border-slate-700 my-1"></div>
                     <button 
                       onClick={() => { resetData(); setIsSettingsMenuOpen(false); }}
-                      className="w-full text-left px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center gap-2"
+                      className="w-full text-left px-4 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2"
                     >
                       <RefreshCw className="w-4 h-4" />
                       <span>{t.resetSample}</span>
@@ -576,7 +578,7 @@ export default function App() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="border-t border-slate-200 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-800/60 px-4 sm:px-6 lg:px-8">
+        <div className="border-t border-slate-200/70 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto flex items-center gap-1 sm:gap-2 overflow-x-auto py-2 no-scrollbar">
             {[
               { id: 'dashboard', label: t.navDashboard, icon: LayoutDashboard },
@@ -591,10 +593,10 @@ export default function App() {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${
                     isActive 
-                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20' 
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/50'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-indigo-500/20' 
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -620,126 +622,146 @@ export default function App() {
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             
-            {/* Banner */}
-            <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+            {/* Radiant Hero Banner */}
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 border border-indigo-500/20 rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 -mt-12 -mr-12 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+              <div className="absolute bottom-0 left-1/3 -mb-12 w-64 h-64 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
                 <div>
-                  <div className="flex items-center gap-2 text-blue-200 text-xs font-semibold uppercase tracking-wider mb-1">
-                    <span>🌟 {settings.shopName}</span>
+                  <div className="flex items-center gap-2 text-indigo-300 text-xs font-bold uppercase tracking-wider mb-2">
+                    <span className="flex items-center gap-1.5 bg-indigo-500/20 border border-indigo-400/30 px-2.5 py-0.5 rounded-full">
+                      <Sparkles className="w-3 h-3 text-indigo-300" />
+                      <span>{settings.shopName}</span>
+                    </span>
                     <span>•</span>
-                    <span>{new Date().toLocaleDateString(lang === 'so' ? 'so-SO' : 'en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    <span className="text-slate-300">{new Date().toLocaleDateString(lang === 'so' ? 'so-SO' : 'en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   </div>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">{t.dashboardGreeting}</h2>
-                  <p className="text-blue-100 text-sm mt-1 max-w-xl">{t.dashboardSub}</p>
+                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">{t.dashboardGreeting}</h2>
+                  <p className="text-indigo-200/90 text-sm mt-1.5 max-w-xl">{t.dashboardSub}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setActiveTab('tickets')} className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 rounded-xl text-sm font-semibold backdrop-blur-sm transition">
+                  <button onClick={() => setActiveTab('tickets')} className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2.5 rounded-xl text-sm font-bold backdrop-blur-md transition hover:scale-105 active:scale-95">
                     {t.viewAllTickets} →
                   </button>
-                  <button onClick={() => openNewTicketModal()} className="bg-white text-blue-900 hover:bg-blue-50 px-4 py-2 rounded-xl text-sm font-bold shadow-md transition">
+                  <button onClick={() => openNewTicketModal()} className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 transition hover:scale-105 active:scale-95">
                     + {t.createTicket}
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* KPI Cards */}
+            {/* Glowing Accent KPI Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
-              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+              
+              {/* Total Repairs */}
+              <div className="glow-card bg-white dark:bg-[#111827] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{t.kpiTotal}</span>
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{t.kpiTotal}</span>
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                     <Layers className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <span className="text-2xl font-bold">{stats.total}</span>
-                  <span className="text-[11px] text-slate-400 block">{t.allTime}</span>
+                  <span className="text-2xl font-black">{stats.total}</span>
+                  <span className="text-[11px] text-slate-400 block font-medium">{t.allTime}</span>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+              {/* Received */}
+              <div className="glow-card bg-white dark:bg-[#111827] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-400 to-blue-500"></div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{t.statusReceived}</span>
-                  <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{t.statusReceived}</span>
+                  <div className="w-8 h-8 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center">
                     <Inbox className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <span className="text-2xl font-bold text-sky-600 dark:text-sky-400">{stats.received}</span>
-                  <span className="text-[11px] text-slate-400 block">{t.stage1}</span>
+                  <span className="text-2xl font-black text-sky-600 dark:text-sky-400">{stats.received}</span>
+                  <span className="text-[11px] text-slate-400 block font-medium">{t.stage1}</span>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+              {/* Repairing */}
+              <div className="glow-card bg-white dark:bg-[#111827] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500"></div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{t.statusRepairing}</span>
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{t.statusRepairing}</span>
+                  <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                     <Cog className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.repairing}</span>
-                  <span className="text-[11px] text-slate-400 block">{t.stage2}</span>
+                  <span className="text-2xl font-black text-amber-500 dark:text-amber-400">{stats.repairing}</span>
+                  <span className="text-[11px] text-slate-400 block font-medium">{t.stage2}</span>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+              {/* Ready */}
+              <div className="glow-card bg-white dark:bg-[#111827] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500"></div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{t.statusReady}</span>
-                  <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{t.statusReady}</span>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                     <CheckCircle className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.ready}</span>
-                  <span className="text-[11px] text-slate-400 block">{t.stage3}</span>
+                  <span className="text-2xl font-black text-emerald-500 dark:text-emerald-400">{stats.ready}</span>
+                  <span className="text-[11px] text-slate-400 block font-medium">{t.stage3}</span>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+              {/* Delivered */}
+              <div className="glow-card bg-white dark:bg-[#111827] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-400 to-indigo-500"></div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{t.statusDelivered}</span>
-                  <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{t.statusDelivered}</span>
+                  <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
                     <PackageCheck className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <span className="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.delivered}</span>
-                  <span className="text-[11px] text-slate-400 block">{t.stage4}</span>
+                  <span className="text-2xl font-black text-purple-500 dark:text-purple-400">{stats.delivered}</span>
+                  <span className="text-[11px] text-slate-400 block font-medium">{t.stage4}</span>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+              {/* Revenue */}
+              <div className="glow-card bg-white dark:bg-[#111827] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400"></div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{t.kpiRevenue}</span>
-                  <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/40 text-green-600 dark:text-green-400 flex items-center justify-center">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{t.kpiRevenue}</span>
+                  <div className="w-8 h-8 rounded-xl bg-green-50 dark:bg-green-950/60 text-green-600 dark:text-green-400 flex items-center justify-center">
                     <Banknote className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <span className="text-2xl font-bold text-green-600 dark:text-green-400">${stats.revenue.toFixed(0)}</span>
-                  <span className="text-[11px] text-rose-500 dark:text-rose-400 font-semibold block">Due: ${stats.pending.toFixed(0)}</span>
+                  <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">${stats.revenue.toFixed(0)}</span>
+                  <span className="text-[11px] text-rose-500 dark:text-rose-400 font-bold block">Due: ${stats.pending.toFixed(0)}</span>
                 </div>
               </div>
+
             </div>
 
             {/* Charts & Urgent Ready List */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
-              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+              <div className="bg-white dark:bg-[#111827] p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
                 <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
-                  <Wrench className="w-4 h-4 text-blue-500" />
+                  <Wrench className="w-4 h-4 text-indigo-500" />
                   <span>{t.chartStatusTitle}</span>
                 </h3>
                 <div className="relative h-60 flex items-center justify-center">
-                  <Doughnut data={statusChartData} options={{ responsive: true, maintainAspectRatio: false, cutout: '65%' }} />
+                  <Doughnut data={statusChartData} options={{ responsive: true, maintainAspectRatio: false, cutout: '70%' }} />
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+              <div className="bg-white dark:bg-[#111827] p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
                 <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-4">
-                  <Laptop className="w-4 h-4 text-indigo-500" />
+                  <Laptop className="w-4 h-4 text-violet-500" />
                   <span>{t.chartBrandsTitle}</span>
                 </h3>
                 <div className="relative h-60 flex items-center justify-center">
@@ -747,14 +769,14 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+              <div className="bg-white dark:bg-[#111827] p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-2">
                       <BellRing className="w-4 h-4 text-amber-500" />
                       <span>{t.readyForDelivery}</span>
                     </h3>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
                       {stats.ready}
                     </span>
                   </div>
@@ -763,16 +785,16 @@ export default function App() {
                       <p className="text-xs text-slate-400 py-6 text-center italic">{lang === 'so' ? 'Hadda ma jiro qalab diyaar ah' : 'No devices ready for pickup'}</p>
                     ) : (
                       tickets.filter(tk => tk.status === 'Ready').map(tk => (
-                        <div key={tk.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2">
+                        <div key={tk.id} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between gap-2 transition hover:bg-slate-100/80 dark:hover:bg-slate-800">
                           <div className="truncate">
                             <span className="text-xs font-bold text-slate-800 dark:text-slate-100 block truncate">{tk.customer.name}</span>
                             <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate block">{tk.device.brandModel}</span>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <button onClick={() => sendWhatsApp(tk)} className="p-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300">
+                            <button onClick={() => sendWhatsApp(tk)} className="p-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300 transition">
                               <MessageSquare className="w-3.5 h-3.5" />
                             </button>
-                            <button onClick={() => advanceStatus(tk.id)} className="px-2 py-1 text-[11px] font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1">
+                            <button onClick={() => advanceStatus(tk.id)} className="px-2.5 py-1 text-[11px] font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white flex items-center gap-1 shadow-sm">
                               <span>{lang === 'so' ? 'Dhiib' : 'Deliver'}</span>
                               <ArrowRight className="w-3 h-3" />
                             </button>
@@ -782,8 +804,8 @@ export default function App() {
                     )}
                   </div>
                 </div>
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-700 mt-4">
-                  <button onClick={() => { setActiveTab('tickets'); setStatusFilter('Ready'); }} className="w-full py-2 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
+                  <button onClick={() => { setActiveTab('tickets'); setStatusFilter('Ready'); }} className="w-full py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/40 hover:from-emerald-100 hover:to-teal-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition">
                     <Send className="w-3.5 h-3.5" />
                     <span>{t.notifyCustomers}</span>
                   </button>
@@ -792,66 +814,66 @@ export default function App() {
 
             </div>
 
-            {/* Recent Repairs Table */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            {/* Recent Repairs Table Preview */}
+            <div className="bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-blue-500" />
+                    <Clock className="w-4 h-4 text-indigo-500" />
                     <span>{t.recentRepairs}</span>
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.recentRepairsSub}</p>
                 </div>
-                <button onClick={() => setActiveTab('tickets')} className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold">
+                <button onClick={() => setActiveTab('tickets')} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-bold">
                   <span>{t.viewAllTickets}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 dark:bg-slate-700/40 text-xs uppercase text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                  <thead className="bg-slate-50/70 dark:bg-slate-800/50 text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                      <th className="py-3 px-4">Ticket</th>
-                      <th className="py-3 px-4">{t.thCustomer}</th>
-                      <th className="py-3 px-4">{t.thDevice}</th>
-                      <th className="py-3 px-4">{t.thStatus}</th>
-                      <th className="py-3 px-4">{t.thCost}</th>
-                      <th className="py-3 px-4 text-right">{t.thActions}</th>
+                      <th className="py-3.5 px-4 font-bold">Ticket</th>
+                      <th className="py-3.5 px-4 font-bold">{t.thCustomer}</th>
+                      <th className="py-3.5 px-4 font-bold">{t.thDevice}</th>
+                      <th className="py-3.5 px-4 font-bold">{t.thStatus}</th>
+                      <th className="py-3.5 px-4 font-bold">{t.thCost}</th>
+                      <th className="py-3.5 px-4 text-right font-bold">{t.thActions}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     {tickets.slice(0, 5).map(tk => (
-                      <tr key={tk.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition">
-                        <td className="py-3 px-4 font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
-                          <button onClick={() => { setActiveInvoice(tk); setIsInvoiceModalOpen(true); }} className="hover:underline flex items-center gap-1">
-                            <FileText className="w-3.5 h-3.5" />
+                      <tr key={tk.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                        <td className="py-3.5 px-4 font-mono font-bold text-xs text-indigo-600 dark:text-indigo-400">
+                          <button onClick={() => { setActiveInvoice(tk); setIsInvoiceModalOpen(true); }} className="hover:underline flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5 text-indigo-500" />
                             {tk.id}
                           </button>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3.5 px-4">
                           <span className="font-bold text-slate-800 dark:text-slate-100 block text-xs">{tk.customer.name}</span>
                           <span className="text-[11px] text-slate-400">{tk.customer.phone}</span>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3.5 px-4">
                           <span className="font-semibold text-slate-800 dark:text-slate-200 block text-xs">{tk.device.brandModel}</span>
                         </td>
-                        <td className="py-3 px-4">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(tk.status)}`}>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${getStatusBadgeClass(tk.status)}`}>
                             {getStatusLabel(tk.status)}
                           </span>
                         </td>
-                        <td className="py-3 px-4">
-                          <span className="font-bold text-xs">${tk.pricing.total}</span>
+                        <td className="py-3.5 px-4">
+                          <span className="font-black text-xs">${tk.pricing.total}</span>
                           {tk.pricing.balance > 0 && (
                             <span className="text-[10px] text-rose-500 font-bold block">Due: ${tk.pricing.balance}</span>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-right">
+                        <td className="py-3.5 px-4 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <button onClick={() => { setActiveInvoice(tk); setIsInvoiceModalOpen(true); }} className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700">
+                            <button onClick={() => { setActiveInvoice(tk); setIsInvoiceModalOpen(true); }} className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition">
                               <Receipt className="w-4 h-4" />
                             </button>
-                            <button onClick={() => sendWhatsApp(tk)} className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-700">
+                            <button onClick={() => sendWhatsApp(tk)} className="p-2 rounded-xl text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 transition">
                               <MessageSquare className="w-4 h-4" />
                             </button>
                           </div>
@@ -871,24 +893,24 @@ export default function App() {
           <div className="space-y-6">
             
             {/* Filter Toolbar */}
-            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="bg-white dark:bg-[#111827] p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               
               <div className="flex flex-wrap items-center gap-3 flex-1">
                 <div className="relative flex-1 min-w-[220px]">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                   <input 
                     type="text" 
                     value={globalSearch}
                     onChange={(e) => setGlobalSearch(e.target.value)}
                     placeholder={lang === 'so' ? "Raadi tikidh, macmiil, taleefan, qalab..." : "Search by ticket #, customer, phone, device..."}
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 pr-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
 
                 <select 
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500 font-bold"
                 >
                   <option value="ALL">{t.allStatuses}</option>
                   <option value="Received">📥 Received (La helay)</option>
@@ -900,7 +922,7 @@ export default function App() {
                 <select 
                   value={paymentFilter}
                   onChange={(e) => setPaymentFilter(e.target.value)}
-                  className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500 font-bold"
                 >
                   <option value="ALL">{t.allPayments}</option>
                   <option value="Paid">🟢 Fully Paid</option>
@@ -911,7 +933,7 @@ export default function App() {
                 {(globalSearch || statusFilter !== 'ALL' || paymentFilter !== 'ALL') && (
                   <button 
                     onClick={() => { setGlobalSearch(''); setStatusFilter('ALL'); setPaymentFilter('ALL'); }}
-                    className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                    className="p-2.5 text-slate-500 hover:text-slate-800 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
                     title="Clear Filters"
                   >
                     <X className="w-4 h-4" />
@@ -921,11 +943,11 @@ export default function App() {
 
               {/* View Switcher & Action */}
               <div className="flex items-center gap-2">
-                <div className="flex items-center bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
                   <button 
                     onClick={() => setTicketView('table')}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition ${
-                      ticketView === 'table' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-600 dark:text-slate-300'
+                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 transition ${
+                      ticketView === 'table' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-slate-600 dark:text-slate-300'
                     }`}
                   >
                     <List className="w-3.5 h-3.5" />
@@ -933,8 +955,8 @@ export default function App() {
                   </button>
                   <button 
                     onClick={() => setTicketView('kanban')}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition ${
-                      ticketView === 'kanban' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-600 dark:text-slate-300'
+                    className={`px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 transition ${
+                      ticketView === 'kanban' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-slate-600 dark:text-slate-300'
                     }`}
                   >
                     <Kanban className="w-3.5 h-3.5" />
@@ -944,7 +966,7 @@ export default function App() {
 
                 <button 
                   onClick={() => openNewTicketModal()}
-                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold flex items-center gap-1.5 shadow-sm transition"
+                  className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl text-sm font-bold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition"
                 >
                   <Plus className="w-4 h-4" />
                   <span>{t.newTicket}</span>
@@ -955,80 +977,80 @@ export default function App() {
 
             {/* VIEW 1: TABLE */}
             {ticketView === 'table' && (
-              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 dark:bg-slate-700/50 text-xs uppercase text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                    <thead className="bg-slate-50/70 dark:bg-slate-800/50 text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
                       <tr>
-                        <th className="py-3 px-4">Ticket</th>
-                        <th className="py-3 px-4">{t.thCustomer}</th>
-                        <th className="py-3 px-4">{t.thDevice}</th>
-                        <th className="py-3 px-4">{t.thIssue}</th>
-                        <th className="py-3 px-4">{t.thStatus}</th>
-                        <th className="py-3 px-4">{t.thFinancials}</th>
-                        <th className="py-3 px-4 text-right">{t.thActions}</th>
+                        <th className="py-3.5 px-4 font-bold">Ticket</th>
+                        <th className="py-3.5 px-4 font-bold">{t.thCustomer}</th>
+                        <th className="py-3.5 px-4 font-bold">{t.thDevice}</th>
+                        <th className="py-3.5 px-4 font-bold">{t.thIssue}</th>
+                        <th className="py-3.5 px-4 font-bold">{t.thStatus}</th>
+                        <th className="py-3.5 px-4 font-bold">{t.thFinancials}</th>
+                        <th className="py-3.5 px-4 text-right font-bold">{t.thActions}</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                       {filteredTickets.map(tk => (
-                        <tr key={tk.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition">
-                          <td className="py-3 px-4 font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
-                            <button onClick={() => { setActiveInvoice(tk); setIsInvoiceModalOpen(true); }} className="hover:underline flex items-center gap-1">
-                              <FileText className="w-3.5 h-3.5" />
+                        <tr key={tk.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                          <td className="py-3.5 px-4 font-mono font-bold text-xs text-indigo-600 dark:text-indigo-400">
+                            <button onClick={() => { setActiveInvoice(tk); setIsInvoiceModalOpen(true); }} className="hover:underline flex items-center gap-1.5">
+                              <FileText className="w-3.5 h-3.5 text-indigo-500" />
                               {tk.id}
                             </button>
                             <span className="text-[10px] text-slate-400 block font-sans">{new Date(tk.createdAt).toLocaleDateString()}</span>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4">
                             <span className="font-bold text-slate-800 dark:text-slate-100 block">{tk.customer.name}</span>
                             <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                               <Phone className="w-3 h-3 text-slate-400" />
                               {tk.customer.phone}
                             </span>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4">
                             <span className="font-semibold text-slate-800 dark:text-slate-200 block">{tk.device.brandModel}</span>
                             <span className="text-xs text-slate-400">SN: {tk.device.serial || 'N/A'}</span>
                           </td>
-                          <td className="py-3 px-4 max-w-xs">
+                          <td className="py-3.5 px-4 max-w-xs">
                             <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2" title={tk.issue}>
                               {tk.issue}
                             </p>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4">
                             <div className="flex items-center gap-1.5">
-                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(tk.status)}`}>
+                              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${getStatusBadgeClass(tk.status)}`}>
                                 {getStatusLabel(tk.status)}
                               </span>
                               {tk.status !== 'Delivered' && (
-                                <button onClick={() => advanceStatus(tk.id)} title="Advance status" className="p-1 rounded-full text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 transition">
+                                <button onClick={() => advanceStatus(tk.id)} title="Advance status" className="p-1 rounded-full text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition">
                                   <ArrowRightCircle className="w-4 h-4" />
                                 </button>
                               )}
                             </div>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4">
                             <div className="space-y-1">
-                              <div className="font-bold text-xs">${tk.pricing.total.toFixed(2)}</div>
+                              <div className="font-black text-xs">${tk.pricing.total.toFixed(2)}</div>
                               {tk.pricing.balance === 0 ? (
-                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">Paid</span>
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md">Paid</span>
                               ) : (
-                                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.5 rounded">Due: ${tk.pricing.balance}</span>
+                                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-md">Due: ${tk.pricing.balance}</span>
                               )}
                             </div>
                           </td>
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <button onClick={() => { setActiveInvoice(tk); setIsInvoiceModalOpen(true); }} className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700">
+                              <button onClick={() => { setActiveInvoice(tk); setIsInvoiceModalOpen(true); }} className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition">
                                 <Receipt className="w-4 h-4" />
                               </button>
-                              <button onClick={() => sendWhatsApp(tk)} className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-700">
+                              <button onClick={() => sendWhatsApp(tk)} className="p-2 rounded-xl text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 transition">
                                 <MessageSquare className="w-4 h-4" />
                               </button>
-                              <button onClick={() => openEditTicketModal(tk)} className="p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-700">
+                              <button onClick={() => openEditTicketModal(tk)} className="p-2 rounded-xl text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 transition">
                                 <Edit3 className="w-4 h-4" />
                               </button>
-                              <button onClick={() => deleteTicket(tk.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700">
+                              <button onClick={() => deleteTicket(tk.id)} className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 transition">
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
@@ -1054,10 +1076,10 @@ export default function App() {
                 {statusFlow.map(st => {
                   const items = filteredTickets.filter(tk => tk.status === st);
                   return (
-                    <div key={st} className="bg-slate-100 dark:bg-slate-800/80 rounded-2xl p-4 flex flex-col border border-slate-200 dark:border-slate-700">
-                      <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-200 dark:border-slate-700">
-                        <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">{getStatusLabel(st)}</h4>
-                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400">
+                    <div key={st} className="bg-slate-100/70 dark:bg-[#111827] rounded-3xl p-4 flex flex-col border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                      <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-200/80 dark:border-slate-800">
+                        <h4 className="font-black text-sm text-slate-800 dark:text-slate-200">{getStatusLabel(st)}</h4>
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm">
                           {items.length}
                         </span>
                       </div>
@@ -1066,10 +1088,10 @@ export default function App() {
                           <div className="p-6 text-center text-xs text-slate-400 italic">No tickets</div>
                         ) : (
                           items.map(tk => (
-                            <div key={tk.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2.5">
+                            <div key={tk.id} className="glow-card bg-white dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm space-y-2.5">
                               <div className="flex items-center justify-between">
-                                <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{tk.id}</span>
-                                <span className="text-xs font-bold text-slate-700 dark:text-slate-200">${tk.pricing.total}</span>
+                                <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">{tk.id}</span>
+                                <span className="text-xs font-black text-slate-700 dark:text-slate-200">${tk.pricing.total}</span>
                               </div>
                               <div>
                                 <h5 className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate">{tk.customer.name}</h5>
@@ -1078,23 +1100,23 @@ export default function App() {
                                   {tk.device.brandModel}
                                 </p>
                               </div>
-                              <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 bg-slate-50 dark:bg-slate-700/40 p-2 rounded-lg">
+                              <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 bg-slate-50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
                                 {tk.issue}
                               </p>
-                              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700">
+                              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/60">
                                 <div className="flex items-center gap-1">
-                                  <button onClick={() => { setActiveInvoice(tk); setIsInvoiceModalOpen(true); }} className="p-1 rounded text-slate-400 hover:text-blue-600">
+                                  <button onClick={() => { setActiveInvoice(tk); setIsInvoiceModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700">
                                     <FileText className="w-3.5 h-3.5" />
                                   </button>
-                                  <button onClick={() => sendWhatsApp(tk)} className="p-1 rounded text-slate-400 hover:text-emerald-600">
+                                  <button onClick={() => sendWhatsApp(tk)} className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-700">
                                     <MessageSquare className="w-3.5 h-3.5" />
                                   </button>
-                                  <button onClick={() => openEditTicketModal(tk)} className="p-1 rounded text-slate-400 hover:text-amber-600">
+                                  <button onClick={() => openEditTicketModal(tk)} className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-slate-100 dark:hover:bg-slate-700">
                                     <Edit3 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
                                 {tk.status !== 'Delivered' ? (
-                                  <button onClick={() => advanceStatus(tk.id)} className="px-2 py-1 text-[11px] font-bold bg-blue-50 dark:bg-blue-900/40 hover:bg-blue-100 text-blue-600 dark:text-blue-300 rounded-lg flex items-center gap-1">
+                                  <button onClick={() => advanceStatus(tk.id)} className="px-2.5 py-1 text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 rounded-xl flex items-center gap-1 transition">
                                     <span>Advance</span>
                                     <ArrowRight className="w-3 h-3" />
                                   </button>
@@ -1120,23 +1142,23 @@ export default function App() {
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">{t.customerDirectory}</h2>
+                <h2 className="text-xl font-black tracking-tight text-slate-800 dark:text-slate-100">{t.customerDirectory}</h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.customerDirectorySub}</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="relative w-full sm:w-72">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                   <input 
                     type="text" 
                     value={customerSearch}
                     onChange={(e) => setCustomerSearch(e.target.value)}
                     placeholder={lang === 'so' ? "Raadi macmiilka magac ama taleefan..." : "Search customer by name or phone..."}
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 pr-3 py-2.5 text-sm bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <button 
                   onClick={() => openNewTicketModal()}
-                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+                  className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl text-sm font-bold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 whitespace-nowrap"
                 >
                   <UserPlus className="w-4 h-4" />
                   <span>{t.addCustomerRepair}</span>
@@ -1146,11 +1168,11 @@ export default function App() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {customerList.map(c => (
-                <div key={c.phone} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                <div key={c.phone} className="glow-card bg-white dark:bg-[#111827] p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
                   <div>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 font-bold flex items-center justify-center text-sm">
+                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black flex items-center justify-center text-sm shadow-md shadow-indigo-500/20">
                           {c.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
@@ -1166,48 +1188,48 @@ export default function App() {
                           const clean = c.phone.replace(/[^0-9]/g, '');
                           window.open(`https://wa.me/${clean}?text=${encodeURIComponent(`Asc ${c.name}, waxaan kaa soo wacaynaa ${settings.shopName}.`)}`, '_blank');
                         }}
-                        className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 text-emerald-600 dark:text-emerald-400"
+                        className="p-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 text-emerald-600 dark:text-emerald-400 transition"
                       >
                         <MessageSquare className="w-4 h-4" />
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 mt-4 p-3 bg-slate-50 dark:bg-slate-700/40 rounded-xl text-center">
+                    <div className="grid grid-cols-3 gap-2 mt-4 p-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl text-center">
                       <div>
                         <span className="text-[10px] uppercase font-bold text-slate-400 block">{lang === 'so' ? 'Qalab' : 'Repairs'}</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{c.tickets.length}</span>
+                        <span className="font-black text-slate-800 dark:text-slate-200 text-sm">{c.tickets.length}</span>
                       </div>
                       <div>
                         <span className="text-[10px] uppercase font-bold text-slate-400 block">{lang === 'so' ? 'Bixiyay' : 'Spent'}</span>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">${c.totalSpent.toFixed(0)}</span>
+                        <span className="font-black text-emerald-500 dark:text-emerald-400 text-sm">${c.totalSpent.toFixed(0)}</span>
                       </div>
                       <div>
                         <span className="text-[10px] uppercase font-bold text-slate-400 block">{lang === 'so' ? 'Deyn' : 'Balance'}</span>
-                        <span className="font-bold text-rose-600 dark:text-rose-400 text-sm">${c.balanceDue.toFixed(0)}</span>
+                        <span className="font-black text-rose-500 dark:text-rose-400 text-sm">${c.balanceDue.toFixed(0)}</span>
                       </div>
                     </div>
 
-                    <div className="mt-3 space-y-1">
-                      <span className="text-[10px] uppercase font-semibold text-slate-400">{lang === 'so' ? 'Qalabkii uu keenay:' : 'Recent Devices:'}</span>
+                    <div className="mt-3.5 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400">{lang === 'so' ? 'Qalabkii uu keenay:' : 'Recent Devices:'}</span>
                       {c.tickets.slice(0, 2).map(tk => (
                         <div key={tk.id} className="text-xs text-slate-600 dark:text-slate-300 flex items-center justify-between">
                           <span className="truncate">{tk.device.brandModel}</span>
-                          <span className="font-mono text-[10px] text-blue-500 font-bold">{tk.id}</span>
+                          <span className="font-mono text-[10px] text-indigo-500 font-bold">{tk.id}</span>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center gap-2">
+                  <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
                     <button 
                       onClick={() => { setActiveTab('tickets'); setGlobalSearch(c.phone); }}
-                      className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold"
+                      className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition"
                     >
                       {lang === 'so' ? 'Eeg Tikidhada' : 'View History'}
                     </button>
                     <button 
                       onClick={() => openNewTicketModal({ name: c.name, phone: c.phone })}
-                      className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
+                      className="flex-1 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-sm transition"
                     >
                       <Plus className="w-3 h-3" />
                       <span>{lang === 'so' ? 'Dayactir Cusub' : 'New Repair'}</span>
@@ -1217,7 +1239,7 @@ export default function App() {
               ))}
             </div>
             {customerList.length === 0 && (
-              <div className="p-12 text-center text-slate-400 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <div className="p-12 text-center text-slate-400 bg-white dark:bg-[#111827] rounded-3xl border border-slate-200 dark:border-slate-800">
                 <Users className="w-12 h-12 mx-auto mb-3 stroke-1 text-slate-300" />
                 <p className="font-semibold text-slate-600 dark:text-slate-300">{t.noCustomersFound}</p>
               </div>
@@ -1229,50 +1251,54 @@ export default function App() {
         {activeTab === 'finances' && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">{t.financesTitle}</h2>
+              <h2 className="text-xl font-black tracking-tight text-slate-800 dark:text-slate-100">{t.financesTitle}</h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.financesSub}</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <span className="text-xs font-medium text-slate-500">{t.totalInvoiced}</span>
+              <div className="glow-card bg-white dark:bg-[#111827] p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+                <span className="text-xs font-bold text-slate-500">{t.totalInvoiced}</span>
                 <div className="mt-2 flex items-baseline justify-between">
                   <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100">${(stats.revenue + stats.pending).toFixed(2)}</h3>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">Gross</span>
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">Gross</span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">{t.laborAndParts}</p>
               </div>
 
-              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <span className="text-xs font-medium text-slate-500">{t.totalCollected}</span>
+              <div className="glow-card bg-white dark:bg-[#111827] p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400"></div>
+                <span className="text-xs font-bold text-slate-500">{t.totalCollected}</span>
                 <div className="mt-2 flex items-baseline justify-between">
-                  <h3 className="text-2xl font-black text-emerald-600 dark:text-emerald-400">${stats.revenue.toFixed(2)}</h3>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">Collected</span>
+                  <h3 className="text-2xl font-black text-emerald-500 dark:text-emerald-400">${stats.revenue.toFixed(2)}</h3>
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">Collected</span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">{t.cashBankEVC}</p>
               </div>
 
-              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <span className="text-xs font-medium text-slate-500">{t.pendingBalance}</span>
+              <div className="glow-card bg-white dark:bg-[#111827] p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-pink-500"></div>
+                <span className="text-xs font-bold text-slate-500">{t.pendingBalance}</span>
                 <div className="mt-2 flex items-baseline justify-between">
-                  <h3 className="text-2xl font-black text-rose-600 dark:text-rose-400">${stats.pending.toFixed(2)}</h3>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300">Remaining</span>
+                  <h3 className="text-2xl font-black text-rose-500 dark:text-rose-400">${stats.pending.toFixed(2)}</h3>
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300">Remaining</span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">{t.awaitingCollection}</p>
               </div>
 
-              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <span className="text-xs font-medium text-slate-500">{t.partsCost}</span>
+              <div className="glow-card bg-white dark:bg-[#111827] p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 to-purple-500"></div>
+                <span className="text-xs font-bold text-slate-500">{t.partsCost}</span>
                 <div className="mt-2 flex items-baseline justify-between">
-                  <h3 className="text-2xl font-black text-indigo-600 dark:text-indigo-400">${stats.partsCost.toFixed(2)}</h3>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">Parts</span>
+                  <h3 className="text-2xl font-black text-violet-500 dark:text-violet-400">${stats.partsCost.toFixed(2)}</h3>
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300">Parts</span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">{t.screensSSDsRAM}</p>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <div className="bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                   <Receipt className="w-4 h-4 text-emerald-500" />
                   <span>{t.financialLedger}</span>
@@ -1280,37 +1306,37 @@ export default function App() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 dark:bg-slate-700/50 text-xs uppercase text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                  <thead className="bg-slate-50/70 dark:bg-slate-800/50 text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                      <th className="py-3 px-4">Ticket</th>
-                      <th className="py-3 px-4">{t.thCustomer}</th>
-                      <th className="py-3 px-4">{t.thLabor}</th>
-                      <th className="py-3 px-4">{t.thParts}</th>
-                      <th className="py-3 px-4">{t.thTotal}</th>
-                      <th className="py-3 px-4">{t.thPaid}</th>
-                      <th className="py-3 px-4">{t.thBalance}</th>
-                      <th className="py-3 px-4">{t.thPaymentMethod}</th>
-                      <th className="py-3 px-4 text-right">Invoice</th>
+                      <th className="py-3.5 px-4 font-bold">Ticket</th>
+                      <th className="py-3.5 px-4 font-bold">{t.thCustomer}</th>
+                      <th className="py-3.5 px-4 font-bold">{t.thLabor}</th>
+                      <th className="py-3.5 px-4 font-bold">{t.thParts}</th>
+                      <th className="py-3.5 px-4 font-bold">{t.thTotal}</th>
+                      <th className="py-3.5 px-4 font-bold">{t.thPaid}</th>
+                      <th className="py-3.5 px-4 font-bold">{t.thBalance}</th>
+                      <th className="py-3.5 px-4 font-bold">{t.thPaymentMethod}</th>
+                      <th className="py-3.5 px-4 text-right font-bold">Invoice</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     {tickets.map(tk => (
-                      <tr key={tk.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition">
-                        <td className="py-3 px-4 font-mono font-bold text-xs text-blue-600 dark:text-blue-400">{tk.id}</td>
-                        <td className="py-3 px-4">
+                      <tr key={tk.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                        <td className="py-3.5 px-4 font-mono font-bold text-xs text-indigo-600 dark:text-indigo-400">{tk.id}</td>
+                        <td className="py-3.5 px-4">
                           <span className="font-bold text-slate-800 dark:text-slate-100 text-xs block">{tk.customer.name}</span>
                           <span className="text-[11px] text-slate-400">{tk.device.brandModel}</span>
                         </td>
-                        <td className="py-3 px-4 text-xs font-semibold">${tk.pricing.labor}</td>
-                        <td className="py-3 px-4 text-xs font-semibold">${tk.pricing.parts}</td>
-                        <td className="py-3 px-4 text-xs font-bold">${tk.pricing.total}</td>
-                        <td className="py-3 px-4 text-xs font-bold text-emerald-600">${tk.pricing.paid}</td>
-                        <td className="py-3 px-4 text-xs font-bold text-rose-600">${tk.pricing.balance}</td>
-                        <td className="py-3 px-4">
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 font-medium">{tk.pricing.method}</span>
+                        <td className="py-3.5 px-4 text-xs font-semibold">${tk.pricing.labor}</td>
+                        <td className="py-3.5 px-4 text-xs font-semibold">${tk.pricing.parts}</td>
+                        <td className="py-3.5 px-4 text-xs font-black">${tk.pricing.total}</td>
+                        <td className="py-3.5 px-4 text-xs font-black text-emerald-500">${tk.pricing.paid}</td>
+                        <td className="py-3.5 px-4 text-xs font-black text-rose-500">${tk.pricing.balance}</td>
+                        <td className="py-3.5 px-4">
+                          <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 font-bold">{tk.pricing.method}</span>
                         </td>
-                        <td className="py-3 px-4 text-right">
-                          <button onClick={() => { setActiveInvoice(tk); setIsInvoiceModalOpen(true); }} className="px-2.5 py-1 text-xs font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded-lg hover:bg-blue-100">
+                        <td className="py-3.5 px-4 text-right">
+                          <button onClick={() => { setActiveInvoice(tk); setIsInvoiceModalOpen(true); }} className="px-3 py-1 text-xs font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 rounded-xl hover:bg-indigo-100 transition">
                             Invoice
                           </button>
                         </td>
@@ -1326,10 +1352,10 @@ export default function App() {
 
         {/* TAB 5: SHOP SETTINGS */}
         {activeTab === 'shopInfo' && (
-          <div className="max-w-3xl mx-auto bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 space-y-6">
+          <div className="max-w-3xl mx-auto bg-white dark:bg-[#111827] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 sm:p-8 space-y-6">
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <Store className="w-5 h-5 text-blue-600" />
+              <h2 className="text-xl font-black tracking-tight text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <Store className="w-5 h-5 text-indigo-500" />
                 <span>{t.shopSettingsTitle}</span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t.shopSettingsSub}</p>
@@ -1342,58 +1368,58 @@ export default function App() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(settings)
               }).catch(err => console.error("Settings sync error:", err));
-              showToast(lang === 'so' ? 'Xogta xarunta waa la keydiyay (Hard Drive Database)' : 'Settings saved to Database!', 'success');
+              showToast(lang === 'so' ? 'Xogta xarunta waa la keydiyay' : 'Settings saved successfully!', 'success');
             }} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{t.labelShopName}</label>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">{t.labelShopName}</label>
                   <input 
                     type="text" 
                     value={settings.shopName}
                     onChange={(e) => setSettings({ ...settings, shopName: e.target.value })}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{t.labelShopPhone}</label>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">{t.labelShopPhone}</label>
                   <input 
                     type="text" 
                     value={settings.phone}
                     onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{t.labelShopEmail}</label>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">{t.labelShopEmail}</label>
                   <input 
                     type="email" 
                     value={settings.email}
                     onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{t.labelShopCity}</label>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">{t.labelShopCity}</label>
                   <input 
                     type="text" 
                     value={settings.location}
                     onChange={(e) => setSettings({ ...settings, location: e.target.value })}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{t.labelWarrantyTerms}</label>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">{t.labelWarrantyTerms}</label>
                   <textarea 
                     rows={3} 
                     value={settings.warranty}
                     onChange={(e) => setSettings({ ...settings, warranty: e.target.value })}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-end">
-                <button type="submit" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center gap-2">
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+                <button type="submit" className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-500/20 transition flex items-center gap-2">
                   <Save className="w-4 h-4" />
                   <span>{t.saveSettings}</span>
                 </button>
@@ -1406,12 +1432,12 @@ export default function App() {
 
       {/* MODAL 1: TICKET CREATE / EDIT */}
       {isTicketModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-up">
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-[#111827] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-up">
             
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/80">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/60">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
                   <Wrench className="w-4 h-4" />
                 </div>
                 <div>
@@ -1420,7 +1446,7 @@ export default function App() {
                   </h3>
                 </div>
               </div>
-              <button onClick={() => setIsTicketModalOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
+              <button onClick={() => setIsTicketModalOpen(false)} className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1429,28 +1455,28 @@ export default function App() {
               
               {/* Customer */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3">1. Customer Information (Macmiilka)</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-3">1. Customer Information (Macmiilka)</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Customer Full Name *</label>
+                    <label className="block text-xs font-bold mb-1.5">Customer Full Name *</label>
                     <input 
                       type="text" 
                       required 
                       value={formData.custName}
                       onChange={(e) => setFormData({ ...formData, custName: e.target.value })}
                       placeholder="e.g. Guled Farah Hassan"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Phone Number *</label>
+                    <label className="block text-xs font-bold mb-1.5">Phone Number *</label>
                     <input 
                       type="tel" 
                       required 
                       value={formData.custPhone}
                       onChange={(e) => setFormData({ ...formData, custPhone: e.target.value })}
                       placeholder="e.g. 061 512 3456"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                 </div>
@@ -1458,14 +1484,14 @@ export default function App() {
 
               {/* Device */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3">2. Device Specifications</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-3">2. Device Specifications</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Device Type</label>
+                    <label className="block text-xs font-bold mb-1.5">Device Type</label>
                     <select 
                       value={formData.deviceType}
                       onChange={(e) => setFormData({ ...formData, deviceType: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold"
                     >
                       <option value="Laptop">Laptop / Buugyaraha</option>
                       <option value="Desktop PC">Desktop PC</option>
@@ -1476,47 +1502,47 @@ export default function App() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Brand & Model *</label>
+                    <label className="block text-xs font-bold mb-1.5">Brand & Model *</label>
                     <input 
                       type="text" 
                       required 
                       value={formData.brandModel}
                       onChange={(e) => setFormData({ ...formData, brandModel: e.target.value })}
                       placeholder="e.g. HP EliteBook 840 G6"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Serial / Service Tag</label>
+                    <label className="block text-xs font-bold mb-1.5">Serial / Service Tag</label>
                     <input 
                       type="text" 
                       value={formData.serial}
                       onChange={(e) => setFormData({ ...formData, serial: e.target.value })}
                       placeholder="e.g. 5CD9283XYZ"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Accessories Received</label>
+                    <label className="block text-xs font-bold mb-1.5">Accessories Received</label>
                     <input 
                       type="text" 
                       value={formData.accessories}
                       onChange={(e) => setFormData({ ...formData, accessories: e.target.value })}
                       placeholder="e.g. Charger, Laptop Bag"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Password / PIN</label>
+                    <label className="block text-xs font-bold mb-1.5">Password / PIN</label>
                     <input 
                       type="text" 
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       placeholder="e.g. 1234 or None"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl"
                     />
                   </div>
                 </div>
@@ -1524,27 +1550,27 @@ export default function App() {
 
               {/* Issue */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3">3. Problem & Diagnostic</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-3">3. Problem & Diagnostic</h4>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Reported Issue *</label>
+                    <label className="block text-xs font-bold mb-1.5">Reported Issue *</label>
                     <textarea 
                       required 
                       rows={2}
                       value={formData.issue}
                       onChange={(e) => setFormData({ ...formData, issue: e.target.value })}
                       placeholder="Describe the defect or client complaints..."
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Technician Notes</label>
+                    <label className="block text-xs font-bold mb-1.5">Technician Notes</label>
                     <textarea 
                       rows={2}
                       value={formData.techNotes}
                       onChange={(e) => setFormData({ ...formData, techNotes: e.target.value })}
                       placeholder="Diagnostic findings, solutions applied..."
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                 </div>
@@ -1552,14 +1578,14 @@ export default function App() {
 
               {/* Status */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3">4. Status Workflow</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-3">4. Status Workflow</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Current Status</label>
+                    <label className="block text-xs font-bold mb-1.5">Current Status</label>
                     <select 
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl font-bold"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold"
                     >
                       <option value="Received">📥 Received (La Helay)</option>
                       <option value="Repairing">⚙️ Repairing (Dayactir)</option>
@@ -1568,90 +1594,90 @@ export default function App() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Technician</label>
+                    <label className="block text-xs font-bold mb-1.5">Technician</label>
                     <input 
                       type="text" 
                       value={formData.technician}
                       onChange={(e) => setFormData({ ...formData, technician: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Pricing & Payments */}
-              <div className="bg-slate-50 dark:bg-slate-750 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-3">5. Qiimaha iyo Lacagta (Pricing & Invoice)</h4>
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-4.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-500 mb-3">5. Qiimaha iyo Lacagta (Pricing & Invoice)</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Labor Cost ($)</label>
+                    <label className="block text-xs font-bold mb-1.5">Labor Cost ($)</label>
                     <input 
                       type="number" 
                       step="0.5" 
                       value={formData.labor}
                       onChange={(e) => setFormData({ ...formData, labor: e.target.value })}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl font-bold"
+                      className="w-full px-3.5 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl font-bold"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Parts Cost ($)</label>
+                    <label className="block text-xs font-bold mb-1.5">Parts Cost ($)</label>
                     <input 
                       type="number" 
                       step="0.5" 
                       value={formData.parts}
                       onChange={(e) => setFormData({ ...formData, parts: e.target.value })}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl font-bold"
+                      className="w-full px-3.5 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl font-bold"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Discount ($)</label>
+                    <label className="block text-xs font-bold mb-1.5">Discount ($)</label>
                     <input 
                       type="number" 
                       step="0.5" 
                       value={formData.discount}
                       onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl font-bold"
+                      className="w-full px-3.5 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl font-bold"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Total Cost ($)</label>
+                    <label className="block text-xs font-bold mb-1.5">Total Cost ($)</label>
                     <input 
                       type="text" 
                       readOnly 
                       value={`$${formTotal.toFixed(2)}`}
-                      className="w-full px-3 py-2 bg-slate-200 dark:bg-slate-600/50 border border-slate-300 dark:border-slate-600 rounded-xl font-black text-blue-600"
+                      className="w-full px-3.5 py-2 bg-slate-200 dark:bg-slate-600/50 border border-slate-300 dark:border-slate-600 rounded-xl font-black text-indigo-600 dark:text-indigo-400"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Paid Amount ($)</label>
+                    <label className="block text-xs font-bold mb-1.5">Paid Amount ($)</label>
                     <input 
                       type="number" 
                       step="0.5" 
                       value={formData.paid}
                       onChange={(e) => setFormData({ ...formData, paid: e.target.value })}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl font-bold text-emerald-600"
+                      className="w-full px-3.5 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl font-bold text-emerald-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1">Balance Due ($)</label>
+                    <label className="block text-xs font-bold mb-1.5">Balance Due ($)</label>
                     <input 
                       type="text" 
                       readOnly 
                       value={`$${formBalance.toFixed(2)}`}
-                      className="w-full px-3 py-2 bg-slate-200 dark:bg-slate-600/50 border border-slate-300 dark:border-slate-600 rounded-xl font-black text-rose-600"
+                      className="w-full px-3.5 py-2 bg-slate-200 dark:bg-slate-600/50 border border-slate-300 dark:border-slate-600 rounded-xl font-black text-rose-500"
                     />
                   </div>
                 </div>
 
                 <div className="mt-3">
-                  <label className="block text-xs font-semibold mb-1">Payment Method</label>
+                  <label className="block text-xs font-bold mb-1.5">Payment Method</label>
                   <select 
                     value={formData.method}
                     onChange={(e) => setFormData({ ...formData, method: e.target.value })}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl"
+                    className="w-full px-3.5 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl font-bold"
                   >
                     <option value="Cash">Cash (Lacag Caddaan ah)</option>
                     <option value="Zaad Service">Zaad Service (Telesom)</option>
@@ -1663,11 +1689,11 @@ export default function App() {
               </div>
 
               {/* Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-                <button type="button" onClick={() => setIsTicketModalOpen(false)} className="px-4 py-2 font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button type="button" onClick={() => setIsTicketModalOpen(false)} className="px-5 py-2.5 font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl">
                   {t.btnCancel}
                 </button>
-                <button type="submit" className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md flex items-center gap-2">
+                <button type="submit" className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold shadow-lg shadow-indigo-500/20 flex items-center gap-2">
                   <Check className="w-4 h-4" />
                   <span>{t.btnSaveTicket}</span>
                 </button>
@@ -1680,40 +1706,40 @@ export default function App() {
 
       {/* MODAL 2: INVOICE & PDF RECEIPT */}
       {isInvoiceModalOpen && activeInvoice && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-3xl w-full max-h-[96vh] flex flex-col overflow-hidden animate-scale-up">
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-[#111827] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-3xl w-full max-h-[96vh] flex flex-col overflow-hidden animate-scale-up">
             
-            <div className="px-6 py-3.5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800">
+            <div className="px-6 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80">
               <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600" />
+                <FileText className="w-5 h-5 text-indigo-500" />
                 <span className="font-bold text-sm text-slate-800 dark:text-slate-100">{t.invoicePreview}</span>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => sendWhatsApp(activeInvoice)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5">
+                <button onClick={() => sendWhatsApp(activeInvoice)} className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm">
                   <MessageSquare className="w-3.5 h-3.5" />
                   <span>WhatsApp</span>
                 </button>
-                <button onClick={() => window.print()} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5">
+                <button onClick={() => window.print()} className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm">
                   <Printer className="w-3.5 h-3.5" />
                   <span>{t.print}</span>
                 </button>
-                <button onClick={() => setIsInvoiceModalOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
+                <button onClick={() => setIsInvoiceModalOpen(false)} className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 bg-white text-slate-900">
-              <div id="invoicePrintArea" className="max-w-2xl mx-auto p-4 sm:p-6 bg-white border border-slate-200 rounded-xl shadow-sm text-slate-900">
+              <div id="invoicePrintArea" className="max-w-2xl mx-auto p-4 sm:p-6 bg-white border border-slate-200 rounded-2xl shadow-sm text-slate-900">
                 
                 <div className="flex justify-between items-start border-b border-slate-200 pb-5">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl font-black tracking-tight text-blue-700">🔧 Sakaria Repair</span>
+                      <span className="text-2xl font-black tracking-tight text-indigo-700">🔧 Sakaria Repair</span>
                       <span className="text-amber-500 text-lg">⭐</span>
                     </div>
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-0.5">{settings.shopName}</p>
-                    <p className="text-xs text-slate-500 mt-1">Tel: {settings.phone}</p>
+                    <p className="text-xs text-slate-500 mt-1">Tel / WhatsApp: {settings.phone}</p>
                     <p className="text-xs text-slate-500">{settings.location}</p>
                   </div>
                   <div className="text-right">
@@ -1730,7 +1756,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 my-5 p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                <div className="grid grid-cols-2 gap-4 my-5 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-xs">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">BILLED TO (MACMIILKA)</span>
                     <p className="font-bold text-sm text-slate-800">{activeInvoice.customer.name}</p>
@@ -1744,26 +1770,26 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="mb-5 text-xs bg-blue-50/60 p-3 rounded-lg border border-blue-100 space-y-1">
-                  <p><strong className="text-blue-900">Reported Issue:</strong> <span className="text-slate-700">{activeInvoice.issue}</span></p>
-                  <p><strong className="text-blue-900">Technician Action:</strong> <span className="text-slate-700">{activeInvoice.techNotes || 'Diagnostics completed.'}</span></p>
+                <div className="mb-5 text-xs bg-indigo-50/60 p-3.5 rounded-xl border border-indigo-100 space-y-1">
+                  <p><strong className="text-indigo-950">Reported Issue:</strong> <span className="text-slate-700">{activeInvoice.issue}</span></p>
+                  <p><strong className="text-indigo-950">Technician Action:</strong> <span className="text-slate-700">{activeInvoice.techNotes || 'Diagnostics completed.'}</span></p>
                 </div>
 
                 <table className="w-full text-xs text-left mb-5">
                   <thead>
                     <tr className="border-b-2 border-slate-200 text-slate-400 uppercase tracking-wider text-[10px]">
-                      <th className="py-2">Description</th>
-                      <th className="py-2 text-right">Amount ($)</th>
+                      <th className="py-2.5">Description</th>
+                      <th className="py-2.5 text-right">Amount ($)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     <tr>
-                      <td className="py-2.5 font-medium text-slate-700">Labor Fee (Shaqada Farsamada)</td>
-                      <td className="py-2.5 text-right font-bold text-slate-800">${Number(activeInvoice.pricing.labor).toFixed(2)}</td>
+                      <td className="py-3 font-medium text-slate-700">Labor Fee (Shaqada Farsamada)</td>
+                      <td className="py-3 text-right font-black text-slate-800">${Number(activeInvoice.pricing.labor).toFixed(2)}</td>
                     </tr>
                     <tr>
-                      <td className="py-2.5 font-medium text-slate-700">Spare Parts (Qalabka la bedelay)</td>
-                      <td className="py-2.5 text-right font-bold text-slate-800">${Number(activeInvoice.pricing.parts).toFixed(2)}</td>
+                      <td className="py-3 font-medium text-slate-700">Spare Parts (Qalabka la bedelay)</td>
+                      <td className="py-3 text-right font-black text-slate-800">${Number(activeInvoice.pricing.parts).toFixed(2)}</td>
                     </tr>
                     {activeInvoice.pricing.discount > 0 && (
                       <tr className="text-emerald-700">
@@ -1774,15 +1800,15 @@ export default function App() {
                   </tbody>
                   <tfoot className="border-t-2 border-slate-200">
                     <tr>
-                      <th className="pt-3 text-slate-600 text-xs">Total Cost (Wadarta):</th>
-                      <th className="pt-3 text-right text-sm font-black text-slate-900">${Number(activeInvoice.pricing.total).toFixed(2)}</th>
+                      <th className="pt-3.5 text-slate-600 text-xs">Total Cost (Wadarta):</th>
+                      <th className="pt-3.5 text-right text-sm font-black text-slate-900">${Number(activeInvoice.pricing.total).toFixed(2)}</th>
                     </tr>
                     <tr>
                       <th className="py-1 text-slate-600 text-xs">Amount Paid (La Bixiyay):</th>
                       <th className="py-1 text-right text-xs font-bold text-emerald-600">${Number(activeInvoice.pricing.paid).toFixed(2)}</th>
                     </tr>
                     <tr className="border-t border-slate-200">
-                      <th className="pt-2 text-slate-800 text-xs uppercase">Remaining Balance (Hadhay):</th>
+                      <th className="pt-2 text-slate-800 text-xs uppercase font-black">Remaining Balance (Hadhay):</th>
                       <th className="pt-2 text-right text-base font-black text-rose-600">${Number(activeInvoice.pricing.balance).toFixed(2)}</th>
                     </tr>
                   </tfoot>
@@ -1799,7 +1825,7 @@ export default function App() {
                       <span className="text-[10px] uppercase text-slate-400">Customer Signature</span>
                     </div>
                     <div className="text-center w-36">
-                      <p className="text-xs font-bold text-blue-700 pb-1">{activeInvoice.technician || 'Sakaria'}</p>
+                      <p className="text-xs font-bold text-indigo-700 pb-1">{activeInvoice.technician || 'Sakaria'}</p>
                       <div className="border-b border-slate-300 mb-1"></div>
                       <span className="text-[10px] uppercase text-slate-400">Technician Signature</span>
                     </div>
@@ -1816,7 +1842,7 @@ export default function App() {
       {/* TOAST CONTAINER */}
       <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
         {toasts.map(toast => (
-          <div key={toast.id} className="px-4 py-3 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2 pointer-events-auto bg-blue-600 text-white animate-scale-up">
+          <div key={toast.id} className="px-4 py-3 rounded-2xl shadow-xl text-xs font-bold flex items-center gap-2 pointer-events-auto bg-gradient-to-r from-blue-600 to-indigo-600 text-white animate-scale-up">
             <Check className="w-4 h-4" />
             <span>{toast.message}</span>
           </div>
