@@ -20,7 +20,7 @@ const DB_FILE = path.join(DATA_DIR, 'repairs_db.json');
 // Initial Seed Data
 const DEFAULT_SETTINGS = {
   shopName: "Sakaria Repair Center",
-  phone: "+252 61 5000000",
+  phone: "+252 61 1616691",
   email: "sakaria.repair@gmail.com",
   location: "Maka Al Mukarama St, Mogadishu",
   warranty: "Dammaanad 30 maalmood ah qalabka la bedelay iyo shaqada la qabtay. Qalabka qoyaanka ama jabka cusub gala dammaanad kuma jirto."

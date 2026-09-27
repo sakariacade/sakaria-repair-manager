@@ -33,3 +33,4 @@ Si aad u furto barnaamijka:
 - 💬 **WhatsApp Notification**: Farriin toos ah oo hal-gujis ah oo loogu dirayo WhatsApp-ka macmiilka.
 - 📊 **Dashboard & Statistics**: Shaxanno Chart.js ah oo muujinaya xaaladaha iyo noocyada kombiyuutarada (HP, Dell, Apple, Lenovo).
 - 🌐 **Bilingual**: Af-Soomaali 🇸🇴 iyo English 🇬🇧.
+- 📱 **WhatsApp Contact**: [+252 61 1616691](https://wa.me/252611616691)

@@ -30,7 +30,8 @@ export default function App() {
 
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem('sakaria_settings');
-    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    return { ...DEFAULT_SETTINGS, ...parsed, phone: "+252 61 1616691" };
   });
 
   // Search & Filter
@@ -502,6 +503,18 @@ export default function App() {
 
             {/* Right Controls */}
             <div className="flex items-center gap-2 sm:gap-3">
+              {/* WhatsApp Quick Link */}
+              <a 
+                href="https://wa.me/252611616691" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition hover:scale-[1.02]"
+                title="WhatsApp: +252 61 1616691"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">+252 61 1616691</span>
+              </a>
+
               <button 
                 onClick={() => openNewTicketModal()}
                 className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm shadow-blue-500/20 transition hover:scale-[1.02] active:scale-95"
