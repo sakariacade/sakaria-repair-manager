@@ -4,7 +4,8 @@ import {
   RefreshCw, LayoutDashboard, Users, DollarSign, Store, Layers, Inbox, 
   Cog, CheckCircle, PackageCheck, Banknote, Laptop, BellRing, Send, 
   Clock, ArrowRight, ArrowRightCircle, List, Kanban, MessageSquare, 
-  FileText, Edit3, Trash2, Plus, Phone, UserPlus, Receipt, Save, X, Check, Printer
+  FileText, Edit3, Trash2, Plus, Phone, UserPlus, Receipt, Save, X, Check, Printer,
+  Database
 } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
@@ -19,6 +20,7 @@ export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('sakaria_theme') || 'light');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [ticketView, setTicketView] = useState('table'); // 'table' | 'kanban'
+  const [dbConnected, setDbConnected] = useState(false);
   
   // Data
   const [tickets, setTickets] = useState(() => {
@@ -69,6 +71,23 @@ export default function App() {
 
   // Dictionary shorthand
   const t = translations[lang] || translations.so;
+
+  // --- CONNECT TO REAL BACKEND DATABASE ---
+  useEffect(() => {
+    fetch('/api/data')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.tickets) {
+          setTickets(data.tickets);
+          if (data.settings) setSettings(data.settings);
+          setDbConnected(true);
+        }
+      })
+      .catch(() => {
+        console.log("Local server offline, falling back to LocalStorage.");
+        setDbConnected(false);
+      });
+  }, []);
 
   // --- PERSISTENCE & THEME EFFECTS ---
   useEffect(() => {
@@ -126,17 +145,24 @@ export default function App() {
   const statusFlow = ['Received', 'Repairing', 'Ready', 'Delivered'];
 
   const advanceStatus = (ticketId) => {
-    setTickets(prev => prev.map(tk => {
-      if (tk.id === ticketId) {
-        const curIdx = statusFlow.indexOf(tk.status);
-        if (curIdx < statusFlow.length - 1) {
-          const nextStatus = statusFlow[curIdx + 1];
-          showToast(lang === 'so' ? `Xaaladda tikidhka ${tk.id} waa la gudbiyay: ${getStatusLabel(nextStatus)}` : `Ticket ${tk.id} status moved to: ${nextStatus}`, 'success');
-          return { ...tk, status: nextStatus, updatedAt: new Date().toISOString() };
-        }
-      }
-      return tk;
-    }));
+    const tk = tickets.find(t => t.id === ticketId);
+    if (!tk) return;
+
+    const curIdx = statusFlow.indexOf(tk.status);
+    if (curIdx < statusFlow.length - 1) {
+      const nextStatus = statusFlow[curIdx + 1];
+      const updated = { ...tk, status: nextStatus, updatedAt: new Date().toISOString() };
+
+      setTickets(prev => prev.map(item => item.id === ticketId ? updated : item));
+      showToast(lang === 'so' ? `Xaaladda tikidhka ${tk.id} waa la gudbiyay: ${getStatusLabel(nextStatus)}` : `Ticket ${tk.id} status moved to: ${nextStatus}`, 'success');
+
+      // Sync with Real Database
+      fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      }).catch(err => console.error("Database sync error:", err));
+    }
   };
 
   const deleteTicket = (ticketId) => {
@@ -144,6 +170,9 @@ export default function App() {
     if (window.confirm(confirmMsg)) {
       setTickets(prev => prev.filter(tk => tk.id !== ticketId));
       showToast(lang === 'so' ? 'Tikidhka waa la tirtiray' : 'Ticket deleted', 'info');
+
+      // Sync with Real Database
+      fetch(`/api/tickets/${ticketId}`, { method: 'DELETE' }).catch(err => console.error("Database sync error:", err));
     }
   };
 
@@ -275,7 +304,7 @@ export default function App() {
     setIsTicketModalOpen(true);
   };
 
-  // Save Ticket Handler
+  // Save Ticket Handler (Saves to Hard Drive Database!)
   const handleSaveTicket = (e) => {
     e.preventDefault();
     const labor = parseFloat(formData.labor) || 0;
@@ -285,30 +314,29 @@ export default function App() {
     const total = Math.max(0, labor + parts - discount);
     const balance = Math.max(0, total - paid);
 
+    let targetTicket;
+
     if (editingTicket) {
-      setTickets(prev => prev.map(tk => {
-        if (tk.id === editingTicket.id) {
-          return {
-            ...tk,
-            customer: { ...tk.customer, name: formData.custName.trim(), phone: formData.custPhone.trim() },
-            device: {
-              type: formData.deviceType,
-              brandModel: formData.brandModel.trim(),
-              serial: formData.serial.trim(),
-              accessories: formData.accessories.trim(),
-              password: formData.password.trim()
-            },
-            issue: formData.issue.trim(),
-            techNotes: formData.techNotes.trim(),
-            status: formData.status,
-            technician: formData.technician.trim(),
-            pricing: { labor, parts, discount, total, paid, balance, method: formData.method },
-            updatedAt: new Date().toISOString()
-          };
-        }
-        return tk;
-      }));
-      showToast(lang === 'so' ? `Tikidhka ${editingTicket.id} waa la cusbooneysiiyay` : `Ticket ${editingTicket.id} updated`, 'success');
+      targetTicket = {
+        ...editingTicket,
+        customer: { ...editingTicket.customer, name: formData.custName.trim(), phone: formData.custPhone.trim() },
+        device: {
+          type: formData.deviceType,
+          brandModel: formData.brandModel.trim(),
+          serial: formData.serial.trim(),
+          accessories: formData.accessories.trim(),
+          password: formData.password.trim()
+        },
+        issue: formData.issue.trim(),
+        techNotes: formData.techNotes.trim(),
+        status: formData.status,
+        technician: formData.technician.trim(),
+        pricing: { labor, parts, discount, total, paid, balance, method: formData.method },
+        updatedAt: new Date().toISOString()
+      };
+
+      setTickets(prev => prev.map(tk => tk.id === editingTicket.id ? targetTicket : tk));
+      showToast(lang === 'so' ? `Tikidhka ${editingTicket.id} waa la cusbooneysiiyay (Database-ka waa la keydiyay)` : `Ticket ${editingTicket.id} saved to Database`, 'success');
     } else {
       const maxNum = tickets.reduce((max, tk) => {
         const num = parseInt(tk.id.replace('SRM-', '')) || 1000;
@@ -316,7 +344,7 @@ export default function App() {
       }, 1000);
       const newId = `SRM-${maxNum + 1}`;
 
-      const newTicket = {
+      targetTicket = {
         id: newId,
         customer: { name: formData.custName.trim(), phone: formData.custPhone.trim(), email: '' },
         device: {
@@ -335,9 +363,16 @@ export default function App() {
         updatedAt: new Date().toISOString()
       };
 
-      setTickets(prev => [newTicket, ...prev]);
-      showToast(lang === 'so' ? `Tikidh cusub waa la diiwaangeliyay: ${newId}` : `New ticket registered: ${newId}`, 'success');
+      setTickets(prev => [targetTicket, ...prev]);
+      showToast(lang === 'so' ? `Tikidh cusub waa la diiwaangeliyay: ${newId} (Hard Drive Saved)` : `New ticket saved to Database: ${newId}`, 'success');
     }
+
+    // Save to Real Database File on Disk
+    fetch('/api/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(targetTicket)
+    }).catch(err => console.error("Database sync error:", err));
 
     setIsTicketModalOpen(false);
   };
@@ -355,12 +390,12 @@ export default function App() {
 
   // Data Export / Reset
   const exportBackup = () => {
-    const payload = { exportedAt: new Date().toISOString(), version: '2.5-react', settings, tickets };
+    const payload = { exportedAt: new Date().toISOString(), version: '2.5-react-db', settings, tickets };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Sakaria_Repair_Manager_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `Sakaria_Repair_Manager_DB_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     showToast(lang === 'so' ? 'Xogta oo dhan waa la soo dejiyay!' : 'Backup exported successfully!', 'success');
@@ -370,6 +405,7 @@ export default function App() {
     if (window.confirm(lang === 'so' ? 'Dib ma ugu celinaa xogtii tusaalaha ahayd?' : 'Reset to sample data?')) {
       setTickets(DEFAULT_TICKETS);
       setSettings(DEFAULT_SETTINGS);
+      fetch('/api/reset', { method: 'POST' }).catch(err => console.error("Database reset error:", err));
       showToast(lang === 'so' ? 'Xogtii hore dib ayaa loo soo celiyay' : 'Reset to sample data', 'info');
     }
   };
@@ -421,7 +457,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             
-            {/* Logo */}
+            {/* Logo & Database Badge */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/30">
                 <Wrench className="w-5 h-5" />
@@ -432,8 +468,15 @@ export default function App() {
                     Sakaria Repair Manager
                   </h1>
                   <span className="text-amber-500 text-sm">⭐</span>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
-                    REACT PRO
+                  
+                  {/* Real Database Indicator */}
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                    dbConnected 
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' 
+                      : 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
+                  }`}>
+                    <Database className="w-3 h-3" />
+                    <span>{dbConnected ? 'Hard Drive DB' : 'Local DB'}</span>
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">{t.subtitle}</p>
@@ -1281,7 +1324,12 @@ export default function App() {
 
             <form onSubmit={(e) => {
               e.preventDefault();
-              showToast(lang === 'so' ? 'Xogta xarunta waa la keydiyay!' : 'Settings saved successfully!', 'success');
+              fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+              }).catch(err => console.error("Settings sync error:", err));
+              showToast(lang === 'so' ? 'Xogta xarunta waa la keydiyay (Hard Drive Database)' : 'Settings saved to Database!', 'success');
             }} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
