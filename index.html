@@ -3,12 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🔧 Sakaria Repair Manager ⭐ | React Edition</title>
-    <!-- Favicon -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔧</text></svg>">
+    <title>🔧 Sakaria Repair Manager</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/sakaria-repair-manager/manifest.json" />
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#6366f1" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SakariaMgr" />
+    <meta name="application-name" content="Sakaria Repair Manager" />
+    <meta name="description" content="Nidaamka maareynta dukaan dayactirka kombiyuutarka" />
+
+    <!-- App Icons -->
+    <link rel="apple-touch-icon" href="/sakaria-repair-manager/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/sakaria-repair-manager/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/sakaria-repair-manager/icon-512.png" />
   </head>
   <body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-full font-sans antialiased transition-colors duration-200">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sakaria-repair-manager/sw.js')
+            .then(reg => console.log('✅ SW registered:', reg.scope))
+            .catch(err => console.log('SW error:', err));
+        });
+      }
+    </script>
   </body>
 </html>
