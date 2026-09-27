@@ -535,7 +535,7 @@ export default function App() {
                   <span className="text-amber-400 text-sm">⭐</span>
                   
                   {/* Database Live Badge */}
-                  <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  <span className={`hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
                     dbConnected 
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800' 
                       : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800'
@@ -547,7 +547,7 @@ export default function App() {
                     <span>{dbConnected ? 'Database Connected' : 'Local Storage'}</span>
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.subtitle}</p>
+                <p className="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400">{t.subtitle}</p>
               </div>
             </div>
 
@@ -642,8 +642,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="border-t border-slate-200/70 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 px-4 sm:px-6 lg:px-8">
+        {/* Tab Navigation — Desktop only */}
+        <div className="hidden sm:block border-t border-slate-200/70 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto flex items-center gap-1 sm:gap-2 overflow-x-auto py-2 no-scrollbar">
             {[
               { id: 'dashboard', label: t.navDashboard, icon: LayoutDashboard },
@@ -681,7 +681,7 @@ export default function App() {
       </header>
 
       {/* MAIN CONTAINER */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 sm:pb-6">
 
         {/* TAB 1: DASHBOARD */}
         {activeTab === 'dashboard' && (
@@ -1904,8 +1904,8 @@ export default function App() {
         </div>
       )}
 
-      {/* TOAST CONTAINER */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
+      {/* TOAST CONTAINER — above bottom nav on mobile */}
+      <div className="fixed bottom-24 sm:bottom-5 right-4 sm:right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-[calc(100vw-2rem)]">
         {toasts.map(toast => (
           <div key={toast.id} className="px-4 py-3 rounded-2xl shadow-xl text-xs font-bold flex items-center gap-2 pointer-events-auto bg-gradient-to-r from-blue-600 to-indigo-600 text-white animate-scale-up">
             <Check className="w-4 h-4" />
@@ -1913,6 +1913,51 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      {/* MOBILE BOTTOM NAVIGATION — hidden on desktop */}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 shadow-2xl shadow-slate-900/20">
+        <div className="flex items-center justify-around px-2 py-2 relative">
+
+          {/* Dashboard */}
+          <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all ${activeTab === 'dashboard' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-500'}`}>
+            <LayoutDashboard className={`w-5 h-5 ${activeTab === 'dashboard' ? 'stroke-[2.5]' : ''}`} />
+            <span className="text-[10px] font-bold">{lang === 'so' ? 'Xogta' : 'Dashboard'}</span>
+          </button>
+
+          {/* Tickets */}
+          <button onClick={() => setActiveTab('tickets')} className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all ${activeTab === 'tickets' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-500'}`}>
+            <div className="relative">
+              <Wrench className={`w-5 h-5 ${activeTab === 'tickets' ? 'stroke-[2.5]' : ''}`} />
+              {tickets.length > 0 && <span className="absolute -top-1.5 -right-2 bg-indigo-600 text-white text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center">{tickets.length > 99 ? '99+' : tickets.length}</span>}
+            </div>
+            <span className="text-[10px] font-bold">{lang === 'so' ? 'Shaqo' : 'Tickets'}</span>
+          </button>
+
+          {/* Center FAB — New Ticket */}
+          <button
+            onClick={() => openNewTicketModal()}
+            className="flex flex-col items-center -mt-5"
+          >
+            <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-500/40 border-4 border-white dark:border-[#0f172a] active:scale-95 transition">
+              <PlusCircle className="w-7 h-7 text-white stroke-[2]" />
+            </div>
+            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">{lang === 'so' ? 'Cusub' : 'New'}</span>
+          </button>
+
+          {/* Customers */}
+          <button onClick={() => setActiveTab('customers')} className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all ${activeTab === 'customers' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-500'}`}>
+            <Users className={`w-5 h-5 ${activeTab === 'customers' ? 'stroke-[2.5]' : ''}`} />
+            <span className="text-[10px] font-bold">{lang === 'so' ? 'Macmiil' : 'Customers'}</span>
+          </button>
+
+          {/* Finances */}
+          <button onClick={() => setActiveTab('finances')} className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all ${activeTab === 'finances' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-500'}`}>
+            <DollarSign className={`w-5 h-5 ${activeTab === 'finances' ? 'stroke-[2.5]' : ''}`} />
+            <span className="text-[10px] font-bold">{lang === 'so' ? 'Lacag' : 'Finance'}</span>
+          </button>
+
+        </div>
+      </nav>
 
     </div>
   );
