@@ -14,6 +14,44 @@ import { translations } from './i18n';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
 
+// ============================================================
+//  🔔 SOUND ENGINE — Web Audio API (no external files needed)
+// ============================================================
+const playSound = (() => {
+  let ctx = null;
+  const getCtx = () => {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    return ctx;
+  };
+  const play = (notes, type = 'sine', gainVal = 0.18) => {
+    try {
+      const ac = getCtx();
+      notes.forEach(([freq, start, dur]) => {
+        const osc = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.connect(gain);
+        gain.connect(ac.destination);
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ac.currentTime + start);
+        gain.gain.setValueAtTime(0, ac.currentTime + start);
+        gain.gain.linearRampToValueAtTime(gainVal, ac.currentTime + start + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + start + dur);
+        osc.start(ac.currentTime + start);
+        osc.stop(ac.currentTime + start + dur + 0.05);
+      });
+    } catch (e) { /* silent fail */ }
+  };
+  return {
+    newTicket:    () => play([[523,0,0.15],[659,0.15,0.15],[784,0.30,0.25]], 'sine', 0.15),
+    success:      () => play([[523,0,0.1],[659,0.1,0.1],[784,0.2,0.1],[1047,0.3,0.3]], 'sine', 0.16),
+    payment:      () => play([[880,0,0.08],[1109,0.08,0.08],[1319,0.16,0.12],[1760,0.28,0.2]], 'triangle', 0.14),
+    whatsapp:     () => play([[660,0,0.07],[880,0.08,0.07],[660,0.16,0.07]], 'sine', 0.12),
+    error:        () => play([[220,0,0.15],[180,0.15,0.2]], 'sawtooth', 0.1),
+    deleteSound:  () => play([[300,0,0.08],[200,0.08,0.15]], 'sawtooth', 0.08),
+    statusChange: () => play([[440,0,0.1],[554,0.12,0.15]], 'sine', 0.13),
+  };
+})();
+
 export default function App() {
   // --- STATE ---
   const [lang, setLang] = useState(() => localStorage.getItem('sakaria_lang') || 'so');
@@ -156,6 +194,13 @@ export default function App() {
       setTickets(prev => prev.map(item => item.id === ticketId ? updated : item));
       showToast(lang === 'so' ? `Xaaladda tikidhka ${tk.id} waa la gudbiyay: ${getStatusLabel(nextStatus)}` : `Ticket ${tk.id} status moved to: ${nextStatus}`, 'success');
 
+      // 🔔 Sound based on new status
+      if (nextStatus === 'Ready' || nextStatus === 'Delivered') {
+        playSound.success();
+      } else {
+        playSound.statusChange();
+      }
+
       fetch('/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -167,11 +212,13 @@ export default function App() {
   const deleteTicket = (ticketId) => {
     const confirmMsg = lang === 'so' ? `Ma hubtaa inaad tirto tikidhka ${ticketId}?` : `Are you sure you want to delete ticket ${ticketId}?`;
     if (window.confirm(confirmMsg)) {
+      playSound.deleteSound(); // 🔔 Delete beep
       setTickets(prev => prev.filter(tk => tk.id !== ticketId));
       showToast(lang === 'so' ? 'Tikidhka waa la tirtiray' : 'Ticket deleted', 'info');
       fetch(`/api/tickets/${ticketId}`, { method: 'DELETE' }).catch(err => console.error("Database sync error:", err));
     }
   };
+
 
   const getStatusLabel = (status) => {
     if (lang === 'so') {
@@ -339,6 +386,12 @@ export default function App() {
 
       setTickets(prev => prev.map(tk => tk.id === editingTicket.id ? targetTicket : tk));
       showToast(lang === 'so' ? `Tikidhka ${editingTicket.id} waa la keydiyay` : `Ticket ${editingTicket.id} saved`, 'success');
+      // 🔔 Sound: payment chime if fully paid, else status change
+      if (balance === 0 && paid > 0) {
+        playSound.payment();
+      } else {
+        playSound.statusChange();
+      }
     } else {
       const maxNum = tickets.reduce((max, tk) => {
         const num = parseInt(tk.id.replace('SRM-', '')) || 1000;
@@ -367,7 +420,9 @@ export default function App() {
 
       setTickets(prev => [targetTicket, ...prev]);
       showToast(lang === 'so' ? `Tikidh cusub waa la keydiyay: ${newId}` : `New ticket saved: ${newId}`, 'success');
+      playSound.newTicket(); // 🔔 New ticket ding
     }
+
 
     fetch('/api/tickets', {
       method: 'POST',
@@ -387,7 +442,9 @@ export default function App() {
       : `Hello ${ticket.customer.name}!\n\nUpdate from *${settings.shopName}*:\nTicket: *${ticket.id}*\nDevice: *${ticket.device.brandModel}*\nStatus: *${statusLabel}*\n\n📊 *Billing:* \n• Total: $${ticket.pricing.total}\n• Paid: $${ticket.pricing.paid}\n• Balance Due: $${ticket.pricing.balance}\n\nThank you! Tel: ${settings.phone}`;
 
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+    playSound.whatsapp(); // 🔔 WhatsApp pop sound
   };
+
 
   // Data Export / Reset
   const exportBackup = () => {
