@@ -153,7 +153,11 @@ export default function App() {
     fetch(CLOUD_GET_URL)
       .then(res => res.text())
       .then(raw => {
-        if (!raw || raw === '""' || raw === 'null') return;
+        if (!raw || raw === '""' || raw === 'null') {
+          // If cloud DB is empty, seed it with current local tickets
+          pushToCloud(tickets);
+          return;
+        }
         try {
           const parsed = JSON.parse(raw);
           if (parsed && Array.isArray(parsed.tickets)) {
@@ -189,6 +193,14 @@ export default function App() {
           }).catch(() => setDbConnected(false));
       });
   };
+
+  const forceCloudSync = () => {
+    fetchCloudData(true);
+    pushToCloud(tickets);
+    showToast(lang === 'so' ? '🔄 Xogta waxaa la waafajiyay Cloud Database!' : '🔄 Cloud DB Synced Successfully!', 'success');
+    playSound.success();
+  };
+
 
   useEffect(() => {
     fetchCloudData(true);
@@ -643,18 +655,26 @@ export default function App() {
                   </h1>
                   <span className="text-amber-400 text-sm">⭐</span>
                   
-                  {/* Database Live Badge */}
-                  <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                    dbConnected || cloudSynced
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800' 
-                      : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
-                  }`} title={lastSyncTime ? `Last sync: ${lastSyncTime}` : 'Multi-device cloud DB active'}>
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span>{cloudSynced ? '☁️ Cloud Sync Live' : (dbConnected ? 'Database' : 'Local')}</span>
-                  </span>
+                  {/* Database Live Badge + Manual Sync Button */}
+                  <div className="flex items-center gap-1.5">
+                    <button 
+                      onClick={forceCloudSync}
+                      className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition active:scale-95 ${
+                        dbConnected || cloudSynced
+                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800' 
+                          : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                      }`} 
+                      title={lastSyncTime ? `Guji si aad u waafajiso (Sida u dambaysay: ${lastSyncTime})` : 'Click to sync live Cloud DB'}
+                    >
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      <span>{cloudSynced ? '☁️ Cloud Sync Live' : (dbConnected ? 'Database' : 'Local')}</span>
+                      <RefreshCw className="w-3 h-3 text-indigo-500 hover:rotate-180 transition-transform duration-500" />
+                    </button>
+                  </div>
+
 
                 </div>
                 <p className="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400">{t.subtitle}</p>
