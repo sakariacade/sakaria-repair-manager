@@ -1,7 +1,7 @@
-const CACHE_NAME = 'sakaria-repair-v1';
+const CACHE_NAME = 'sakaria-repair-v2.6';
 const urlsToCache = [
   '/sakaria-repair-manager/',
-  '/sakaria-repair-manager/index.html',
+  '/sakaria-repair-manager/index.html'
 ];
 
 self.addEventListener('install', (event) => {
@@ -20,7 +20,12 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Network-first for HTML & dynamic requests to ensure instant multi-device cloud sync
 self.addEventListener('fetch', (event) => {
+  if (event.request.url.includes('keyvalue.immanuel.co') || event.request.url.includes('/api/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
   event.respondWith(
     fetch(event.request)
       .then((response) => {
