@@ -442,16 +442,47 @@ export default function App() {
   };
 
   // WhatsApp helper
+  const formatWhatsAppPhone = (phoneStr) => {
+    let cleaned = (phoneStr || '').replace(/[^0-9]/g, '');
+    if (!cleaned) return '';
+    if (cleaned.startsWith('0')) {
+      cleaned = '252' + cleaned.slice(1);
+    } else if (!cleaned.startsWith('252') && (cleaned.length === 8 || cleaned.length === 9)) {
+      cleaned = '252' + cleaned;
+    }
+    return cleaned;
+  };
+
   const sendWhatsApp = (ticket) => {
-    const cleanPhone = ticket.customer.phone.replace(/[^0-9]/g, '');
+    if (!ticket || !ticket.customer) return;
+    const cleanPhone = formatWhatsAppPhone(ticket.customer.phone);
+    
+    if (!cleanPhone || cleanPhone.length < 8) {
+      showToast(lang === 'so' ? 'Lambaranka macmiilka ma saxana!' : 'Invalid customer phone number!', 'error');
+      playSound.error();
+      return;
+    }
+
     const statusLabel = getStatusLabel(ticket.status);
     const msg = lang === 'so'
-      ? `Asc ${ticket.customer.name}!\n\nWaxaan kaala soo xiriiraynaa *${settings.shopName}*.\nTikidhka: *${ticket.id}*\nQalabka: *${ticket.device.brandModel}*\nXaaladda: *${statusLabel}*\n\n📊 *Xisaabta:* \n• Wadarta: $${ticket.pricing.total}\n• La Bixiyay: $${ticket.pricing.paid}\n• Hadhay: $${ticket.pricing.balance}\n\nMahadsanid! Tel: ${settings.phone}`
-      : `Hello ${ticket.customer.name}!\n\nUpdate from *${settings.shopName}*:\nTicket: *${ticket.id}*\nDevice: *${ticket.device.brandModel}*\nStatus: *${statusLabel}*\n\n📊 *Billing:* \n• Total: $${ticket.pricing.total}\n• Paid: $${ticket.pricing.paid}\n• Balance Due: $${ticket.pricing.balance}\n\nThank you! Tel: ${settings.phone}`;
+      ? `Asc *${ticket.customer.name}*!\n\nWaxaan kaala soo xiriiraynaa *${settings.shopName}*.\n\n📦 *Tikidhka:* ${ticket.id}\n💻 *Qalabka:* ${ticket.device.brandModel}\n⚡ *Xaaladda:* ${statusLabel}\n\n📊 *Xisaabta:* \n• Wadarta: $${ticket.pricing.total}\n• La Bixiyay: $${ticket.pricing.paid}\n• Hadhay (Balance): $${ticket.pricing.balance}\n\nQalabkaagii waa diyaar! Waad soo doonan kartaa.\nMahadsanid! Tel: ${settings.phone}`
+      : `Hello *${ticket.customer.name}*!\n\nUpdate from *${settings.shopName}*:\n\n📦 *Ticket:* ${ticket.id}\n💻 *Device:* ${ticket.device.brandModel}\n⚡ *Status:* ${statusLabel}\n\n📊 *Billing:* \n• Total: $${ticket.pricing.total}\n• Paid: $${ticket.pricing.paid}\n• Balance Due: $${ticket.pricing.balance}\n\nYour device is ready for pickup!\nThank you! Tel: ${settings.phone}`;
 
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-    playSound.whatsapp(); // 🔔 WhatsApp pop sound
+    const url = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`;
+
+    try {
+      const win = window.open(url, '_blank');
+      if (!win || win.closed || typeof win.closed === 'undefined') {
+        window.location.href = url;
+      }
+    } catch (e) {
+      window.location.href = url;
+    }
+
+    showToast(lang === 'so' ? `WhatsApp loo diray ${ticket.customer.name}` : `WhatsApp sent to ${ticket.customer.name}`, 'success');
+    playSound.whatsapp();
   };
+
 
 
   // Data Export / Reset
@@ -856,14 +887,20 @@ export default function App() {
                             <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate block">{tk.device.brandModel}</span>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <button onClick={() => sendWhatsApp(tk)} className="p-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300 transition">
+                            <button 
+                              onClick={() => sendWhatsApp(tk)} 
+                              className="px-2.5 py-1 text-[11px] font-bold rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-95 text-white flex items-center gap-1 shadow-sm shadow-emerald-500/20 transition"
+                              title="Farriin WhatsApp u dir macmiilka"
+                            >
                               <MessageSquare className="w-3.5 h-3.5" />
+                              <span>{lang === 'so' ? 'WhatsApp' : 'WA'}</span>
                             </button>
                             <button onClick={() => advanceStatus(tk.id)} className="px-2.5 py-1 text-[11px] font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white flex items-center gap-1 shadow-sm">
                               <span>{lang === 'so' ? 'Dhiib' : 'Deliver'}</span>
                               <ArrowRight className="w-3 h-3" />
                             </button>
                           </div>
+
                         </div>
                       ))
                     )}
