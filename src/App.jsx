@@ -119,21 +119,82 @@ export default function App() {
   // Dictionary shorthand
   const t = translations[lang] || translations.so;
 
-  // --- CONNECT TO REAL BACKEND DATABASE ---
-  useEffect(() => {
-    fetch('/api/data')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.tickets) {
-          setTickets(data.tickets);
-          if (data.settings) setSettings({ ...data.settings, phone: "+252 61 1616691" });
-          setDbConnected(true);
-        }
+  // --- MULTI-DEVICE LIVE CLOUD DATABASE SYNC ENGINE ---
+  const CLOUD_APP_KEY = 'sakaria_srm_app_db_2026';
+  const CLOUD_GET_URL = `https://keyvalue.immanuel.co/api/KeyVal/GetValue/${CLOUD_APP_KEY}/data`;
+  const CLOUD_PUT_URL = `https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${CLOUD_APP_KEY}/data/`;
+
+  const [cloudSynced, setCloudSynced] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+
+  // Push local changes live to Cloud DB
+  const pushToCloud = (newTickets, newSettings = settings) => {
+    try {
+      const payload = JSON.stringify({ tickets: newTickets, settings: newSettings, updatedAt: new Date().toISOString() });
+      fetch(CLOUD_PUT_URL + encodeURIComponent(payload), { method: 'POST' })
+        .then(res => res.json())
+        .then(ok => {
+          if (ok) {
+            setCloudSynced(true);
+            setDbConnected(true);
+            setLastSyncTime(new Date().toLocaleTimeString());
+          }
+        })
+        .catch(err => console.log('Cloud push error:', err));
+    } catch (e) {}
+  };
+
+  // Fetch live cloud data from any device
+  const fetchCloudData = (isInitial = false) => {
+    fetch(CLOUD_GET_URL)
+      .then(res => res.text())
+      .then(raw => {
+        if (!raw || raw === '""' || raw === 'null') return;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.tickets)) {
+            setCloudSynced(true);
+            setDbConnected(true);
+            setLastSyncTime(new Date().toLocaleTimeString());
+
+            setTickets(prev => {
+              if (JSON.stringify(prev) !== JSON.stringify(parsed.tickets)) {
+                if (!isInitial && parsed.tickets.length > prev.length) {
+                  showToast(lang === 'so' ? '📱 Macmiil/Tikidh cusub ayaa laga helay taleefan kale!' : '📱 New ticket synced from another device!', 'success');
+                  playSound.newTicket();
+                }
+                return parsed.tickets;
+              }
+              return prev;
+            });
+
+            if (parsed.settings) {
+              setSettings(prev => ({ ...DEFAULT_SETTINGS, ...parsed.settings, phone: "+252 61 1616691" }));
+            }
+          }
+        } catch (e) {}
       })
       .catch(() => {
-        setDbConnected(false);
+        fetch('/api/data')
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.tickets) {
+              setTickets(data.tickets);
+              setDbConnected(true);
+            }
+          }).catch(() => setDbConnected(false));
       });
+  };
+
+  useEffect(() => {
+    fetchCloudData(true);
+    // Poll cloud DB every 4 seconds for instant multi-device live sync
+    const interval = setInterval(() => {
+      fetchCloudData(false);
+    }, 4000);
+    return () => clearInterval(interval);
   }, []);
+
 
   // --- PERSISTENCE & THEME EFFECTS ---
   useEffect(() => {
@@ -199,7 +260,10 @@ export default function App() {
       const nextStatus = statusFlow[curIdx + 1];
       const updated = { ...tk, status: nextStatus, updatedAt: new Date().toISOString() };
 
-      setTickets(prev => prev.map(item => item.id === ticketId ? updated : item));
+      const updatedList = tickets.map(item => item.id === ticketId ? updated : item);
+      setTickets(updatedList);
+      pushToCloud(updatedList); // ☁️ Push live to all devices
+
       showToast(lang === 'so' ? `Xaaladda tikidhka ${tk.id} waa la gudbiyay: ${getStatusLabel(nextStatus)}` : `Ticket ${tk.id} status moved to: ${nextStatus}`, 'success');
 
       // 🔔 Sound based on new status
@@ -221,11 +285,14 @@ export default function App() {
     const confirmMsg = lang === 'so' ? `Ma hubtaa inaad tirto tikidhka ${ticketId}?` : `Are you sure you want to delete ticket ${ticketId}?`;
     if (window.confirm(confirmMsg)) {
       playSound.deleteSound(); // 🔔 Delete beep
-      setTickets(prev => prev.filter(tk => tk.id !== ticketId));
+      const updatedList = tickets.filter(tk => tk.id !== ticketId);
+      setTickets(updatedList);
+      pushToCloud(updatedList); // ☁️ Push live to all devices
       showToast(lang === 'so' ? 'Tikidhka waa la tirtiray' : 'Ticket deleted', 'info');
       fetch(`/api/tickets/${ticketId}`, { method: 'DELETE' }).catch(err => console.error("Database sync error:", err));
     }
   };
+
 
 
   const getStatusLabel = (status) => {
@@ -392,7 +459,9 @@ export default function App() {
         updatedAt: new Date().toISOString()
       };
 
-      setTickets(prev => prev.map(tk => tk.id === editingTicket.id ? targetTicket : tk));
+      const updatedList = tickets.map(tk => tk.id === editingTicket.id ? targetTicket : tk);
+      setTickets(updatedList);
+      pushToCloud(updatedList); // ☁️ Push live to all devices
       showToast(lang === 'so' ? `Tikidhka ${editingTicket.id} waa la keydiyay` : `Ticket ${editingTicket.id} saved`, 'success');
       // 🔔 Sound: payment chime if fully paid, else status change
       if (balance === 0 && paid > 0) {
@@ -426,10 +495,13 @@ export default function App() {
         updatedAt: new Date().toISOString()
       };
 
-      setTickets(prev => [targetTicket, ...prev]);
+      const updatedList = [targetTicket, ...tickets];
+      setTickets(updatedList);
+      pushToCloud(updatedList); // ☁️ Push live to all devices
       showToast(lang === 'so' ? `Tikidh cusub waa la keydiyay: ${newId}` : `New ticket saved: ${newId}`, 'success');
       playSound.newTicket(); // 🔔 New ticket ding
     }
+
 
 
     fetch('/api/tickets', {
@@ -566,17 +638,18 @@ export default function App() {
                   <span className="text-amber-400 text-sm">⭐</span>
                   
                   {/* Database Live Badge */}
-                  <span className={`hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                    dbConnected 
+                  <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                    dbConnected || cloudSynced
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800' 
-                      : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800'
-                  }`}>
+                      : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                  }`} title={lastSyncTime ? `Last sync: ${lastSyncTime}` : 'Multi-device cloud DB active'}>
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                    <span>{dbConnected ? 'Database Connected' : 'Local Storage'}</span>
+                    <span>{cloudSynced ? '☁️ Cloud Sync Live' : (dbConnected ? 'Database' : 'Local')}</span>
                   </span>
+
                 </div>
                 <p className="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400">{t.subtitle}</p>
               </div>
