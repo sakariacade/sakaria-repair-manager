@@ -84,7 +84,11 @@ export default function App() {
   const [globalSearch, setGlobalSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [paymentFilter, setPaymentFilter] = useState('ALL');
+  const [technicianFilter, setTechnicianFilter] = useState('ALL');
   const [customerSearch, setCustomerSearch] = useState('');
+
+  const techniciansList = ['Sakaria', 'Cabdiraxmaan', 'Sakaria Dheere'];
+
 
   // Modals
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
@@ -350,10 +354,12 @@ export default function App() {
       else if (tk.pricing.paid > 0 && tk.pricing.balance > 0) pStatus = 'Partial';
 
       const matchPayment = paymentFilter === 'ALL' || pStatus === paymentFilter;
+      const matchTechnician = technicianFilter === 'ALL' || (tk.technician || 'Sakaria') === technicianFilter;
 
-      return matchText && matchStatus && matchPayment;
+      return matchText && matchStatus && matchPayment && matchTechnician;
     });
-  }, [tickets, globalSearch, statusFilter, paymentFilter]);
+  }, [tickets, globalSearch, statusFilter, paymentFilter, technicianFilter]);
+
 
   // Aggregated Customers
   const customerList = useMemo(() => {
@@ -1105,15 +1111,28 @@ export default function App() {
                   <option value="Unpaid">🔴 Unpaid</option>
                 </select>
 
-                {(globalSearch || statusFilter !== 'ALL' || paymentFilter !== 'ALL') && (
+                <select 
+                  value={technicianFilter}
+                  onChange={(e) => setTechnicianFilter(e.target.value)}
+                  className="px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500 font-bold"
+                >
+                  <option value="ALL">👨‍🔧 Dhammaan Farsamada</option>
+                  {techniciansList.map(tech => (
+                    <option key={tech} value={tech}>👨‍🔧 {tech}</option>
+                  ))}
+                </select>
+
+
+                {(globalSearch || statusFilter !== 'ALL' || paymentFilter !== 'ALL' || technicianFilter !== 'ALL') && (
                   <button 
-                    onClick={() => { setGlobalSearch(''); setStatusFilter('ALL'); setPaymentFilter('ALL'); }}
+                    onClick={() => { setGlobalSearch(''); setStatusFilter('ALL'); setPaymentFilter('ALL'); setTechnicianFilter('ALL'); }}
                     className="p-2.5 text-slate-500 hover:text-slate-800 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
                     title="Clear Filters"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 )}
+
               </div>
 
               {/* View Switcher & Action */}
@@ -1593,12 +1612,36 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Technicians Section */}
+              <div className="pt-6 border-t border-slate-200 dark:border-slate-800">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-3 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-indigo-500" />
+                  <span>{lang === 'so' ? 'Farsamoyaqaanada Xarunta (Technicians)' : 'Shop Technicians'}</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {techniciansList.map(tech => (
+                    <div key={tech} className="p-3.5 rounded-2xl bg-indigo-50/50 dark:bg-slate-800/60 border border-indigo-100 dark:border-slate-700 flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-600 text-white font-bold flex items-center justify-center text-sm shadow-md shadow-indigo-500/20">
+                        {tech[0]}
+                      </div>
+                      <div>
+                        <span className="font-bold text-slate-800 dark:text-slate-100 block text-xs">{tech}</span>
+                        <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">
+                          {tickets.filter(tk => (tk.technician || 'Sakaria') === tech).length} {lang === 'so' ? 'Shaqo' : 'Repairs'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
                 <button type="submit" className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-500/20 transition flex items-center gap-2">
                   <Save className="w-4 h-4" />
                   <span>{t.saveSettings}</span>
                 </button>
               </div>
+
             </form>
           </div>
         )}
@@ -1769,14 +1812,21 @@ export default function App() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1.5">Technician</label>
-                    <input 
-                      type="text" 
+                    <label className="block text-xs font-bold mb-1.5">{lang === 'so' ? 'Farsamoyaqaanka (Technician)' : 'Technician'}</label>
+                    <select 
                       value={formData.technician}
                       onChange={(e) => setFormData({ ...formData, technician: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl"
-                    />
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-slate-800 dark:text-slate-100"
+                    >
+                      {techniciansList.map(tech => (
+                        <option key={tech} value={tech}>👨‍🔧 {tech}</option>
+                      ))}
+                      {formData.technician && !techniciansList.includes(formData.technician) && (
+                        <option value={formData.technician}>👨‍🔧 {formData.technician}</option>
+                      )}
+                    </select>
                   </div>
+
                 </div>
               </div>
 
