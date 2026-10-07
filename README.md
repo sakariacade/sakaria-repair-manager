@@ -1,36 +1,65 @@
-# 🔧 Sakaria Repair Manager ⭐ (React Edition)
+# 🔧 Sakaria Repair Manager ⭐
 ### Professional Computer & Laptop Repair Management System
-
-Built with **React 18**, **Vite**, **Tailwind CSS**, **Lucide Icons**, and **Chart.js**.
 
 ---
 
-## 🇸🇴 Tilmaamaha Af-Soomaaliga
+## 🔐 XOGTA LOG-IN KA (LOGIN CREDENTIALS)
 
-Barnaamijkan waa nidaam dhammaystiran oo loogu talagalay maamulka xarumaha ciladbixinta kombiyuutarada iyo laptop-yada.
+Haddii aad hilmaamto password-ka ama aad rabto inaad ka soo gasho taleefanka/PC-ga, waa kan diiwaanka xogta lagu galo:
 
-### 🚀 Sida Loogu Kiciyo Kombiyuutarkaaga (How to Run):
-Waxaan kombiyuutarkaaga ku rakibnay **Node.js LTS** iyo **NPM**.
-Si aad u furto barnaamijka:
-1. Fur PowerShell ama Terminal galka mashruuca:
-   ```bash
-   cd C:\Users\hp\.gemini\antigravity\scratch\sakaria-repair-manager
+### 🔑 1. Admin (Maamulaha Buuxa)
+- **Username:** `admin`
+- **Password:** `Admin@Sakaria2026`
+- **Awoodda:** Wuxuu arki karaa dhamaan tikidhyada, maamuli karaa users-ka, tirtiri karaa tikidhyada, isla markaana beddeli karaa settings-ka.
+
+### 🔧 2. Technician (Farsamayaqaan - Sakaria)
+- **Username:** `sakaria`
+- **Password:** `Tech@Sakaria123`
+- **Awoodda:** Wuxuu arkaa oo kaliya tikidhyada isaga loo igmaday ( assigned to Sakaria ).
+
+### 🔧 3. Technician (Farsamayaqaan - Cabdiraxmaan)
+- **Username:** `cabdiraxmaan`
+- **Password:** `Tech@Sakaria123`
+- **Awoodda:** Wuxuu arkaa oo kaliya tikidhyada isaga loo igmaday ( assigned to Cabdiraxmaan ).
+
+### 📋 4. Receptionist (Shaqaale / Soo Dhaweyn)
+- **Username:** `receptionist`
+- **Password:** `Recep@Sakaria123`
+- **Awoodda:** Diiwaangelinta macaamiisha, tikidhyada cusub, iyo qabashada lacagaha.
+
+---
+
+## 🌐 LINKIYADA SYSTEM-KA (APPLICATION LINKS)
+
+- **Online Live Link (GitHub Pages):** [https://sakariacade.github.io/sakaria-repair-manager/](https://sakariacade.github.io/sakaria-repair-manager/)
+- **Local Wi-Fi Network Link:** `http://192.168.100.36:3000`
+- **Local Computer Link:** `http://localhost:3000`
+
+---
+
+## 🚀 Sida Loogu Kiciyo Koompiyuutarkaaga (How to Run Locally)
+
+1. Fur Terminal galka Desktop-ka:
+   ```cmd
+   cd C:\Users\hp\Desktop\sakaria-repair-manager
    ```
-2. Ku dhufo:
-   ```bash
+2. Kici Backend-ka iyo Frontend-ka:
+   ```cmd
+   npm run server
    npm run dev
    ```
-3. Wuxuu si toos ah browser-kaaga ugu furayaa: `http://localhost:3000`
+3. Ka fur browser-ka: `http://localhost:3000`
 
 ---
 
 ## 🌟 Astaamaha Barnaamijka:
-- 💻 **Computer/Laptop Repair**: Diiwaangelinta Laptop, Desktop PC, MacBook, All-in-One, Serial Number, Accessories, Password.
-- 👥 **Customer Records**: Diiwaanka macaamiisha, xisaabinta dakhliga uu soo galiyay iyo deynta lagu leeyahay.
-- 🔄 **Status Workflow**: `Received` → `Repairing` → `Ready` → `Delivered` (Table View & Kanban Pipeline).
-- 💰 **Qiimaha iyo Lacagta**: Labor + Parts - Discount = Total, lacagaha la bixiyay iyo haraaga dhiman.
-- 📄 **PDF Invoice & Printing**: Qaansheegad A4 oo rasmi ah, dammaanad (warranty), iyo saxeexyada farsamoyaqaanka.
-- 💬 **WhatsApp Notification**: Farriin toos ah oo hal-gujis ah oo loogu dirayo WhatsApp-ka macmiilka.
-- 📊 **Dashboard & Statistics**: Shaxanno Chart.js ah oo muujinaya xaaladaha iyo noocyada kombiyuutarada (HP, Dell, Apple, Lenovo).
-- 🌐 **Bilingual**: Af-Soomaali 🇸🇴 iyo English 🇬🇧.
-- 📱 **WhatsApp Contact**: [+252 61 1616691](https://wa.me/252611616691)
+- 💻 **Computer/Laptop Repair**: Diiwaangelinta Laptop, Desktop PC, MacBook, Serial Number, Accessories, Password.
+- 👥 **Customer Records**: Diiwaanka macaamiisha, xisaabinta dakhliga iyo deynta.
+- 🔒 **Role-Based Access Control**: Admin, Technician (own scope), Receptionist.
+- 🔄 **Status Workflow**: `Received` → `Repairing` → `Ready` → `Delivered`.
+- 💰 **Billing & Payment**: Labor + Parts - Discount = Total, paid & balance.
+- 🧾 **PDF Invoice & Printing**: Qaansheegad A4 oo rasmi ah meel kasta.
+- 💬 **WhatsApp Notification**: Farriin toos ah `wa.me/252...` oo hal-gujis ah.
+- 🗄️ **Real Database & Auto Backup**: SQLite local database & 24h backup.
+- 📱 **Mobile & Tablet Friendly**: 100% responsive.
+- 📞 **WhatsApp Support**: [+252 61 1616691](https://wa.me/252611616691)
