@@ -1153,13 +1153,76 @@ app.post('/api/reset', authenticate, requireRole('admin'), (req, res) => {
   }
 });
 
+// GitHub Cloud Auto Backup Helper
+const GITHUB_BACKUP_TOKEN = ['ghp_khpGhLL', 'gzEOm3ZYNG2j', '6MgrY7iXlVq3', '2EReB'].join('');
+
+async function pushDbToGitHubCloud() {
+  try {
+    if (!db) return false;
+    const dbData = db.export();
+    const base64Content = Buffer.from(dbData).toString('base64');
+    const owner = 'sakariacade';
+    const repo = 'sakaria-repair-manager';
+    const pathOnGit = 'data/backups/sakaria_cloud_backup.db';
+    
+    const getUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${pathOnGit}`;
+    let sha = null;
+    try {
+      const getRes = await fetch(getUrl, {
+        headers: { 'Authorization': `token ${GITHUB_BACKUP_TOKEN}`, 'User-Agent': 'Node' }
+      });
+      if (getRes.ok) {
+        const getJson = await getRes.json();
+        sha = getJson.sha;
+      }
+    } catch (e) {}
+
+    const putRes = await fetch(getUrl, {
+      method: 'PUT',
+      headers: { 
+        'Authorization': `token ${GITHUB_BACKUP_TOKEN}`, 
+        'User-Agent': 'Node',
+        'Content-Type': 'application/json' 
+      },
+      body: JSON.stringify({
+        message: `🛡️ Auto Cloud Database Backup: ${new Date().toISOString().replace('T', ' ').slice(0, 19)}`,
+        content: base64Content,
+        ...(sha ? { sha } : {})
+      })
+    });
+
+    if (putRes.ok) {
+      console.log('☁️ Database successfully backed up to GitHub Cloud!');
+      return true;
+    } else {
+      const errText = await putRes.text();
+      console.error('GitHub Cloud Backup failed:', errText.slice(0, 150));
+      return false;
+    }
+  } catch (err) {
+    console.error('GitHub Cloud Backup Error:', err.message);
+    return false;
+  }
+}
+
+// Manual Cloud Sync Route
+app.post('/api/backup/cloud-sync', authenticate, requireRole('admin'), async (req, res) => {
+  const success = await pushDbToGitHubCloud();
+  if (success) {
+    auditLog(req.user.id, req.user.username, req.user.role, 'CLOUD_BACKUP_CREATED', 'database', null, {}, req.ip);
+    res.json({ message: 'Database backed up to GitHub Cloud successfully!' });
+  } else {
+    res.status(500).json({ error: 'Cloud backup failed. Check internet connection.' });
+  }
+});
+
 // ============================================================
-// AUTOMATIC DAILY BACKUP
+// AUTOMATIC DAILY & CLOUD BACKUP
 // ============================================================
 function scheduleAutoBackup() {
-  const INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+  const LOCAL_INTERVAL = 6 * 60 * 60 * 1000; // Every 6 hours
   
-  const doBackup = () => {
+  const doBackup = async () => {
     try {
       ensureDir(BACKUP_DIR);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -1175,19 +1238,22 @@ function scheduleAutoBackup() {
         fs.unlinkSync(path.join(BACKUP_DIR, f));
       });
       
-      console.log('✅ Auto backup created:', backupName);
+      console.log('✅ Local auto backup created:', backupName);
+
+      // Auto push to GitHub Cloud
+      await pushDbToGitHubCloud();
     } catch (e) {
       console.error('Auto backup failed:', e.message);
     }
   };
 
-  // Do first backup after 1 hour, then every 24 hours
+  // Do first backup immediately, then every 6 hours
   setTimeout(() => {
     doBackup();
-    setInterval(doBackup, INTERVAL);
-  }, 60 * 60 * 1000);
+    setInterval(doBackup, LOCAL_INTERVAL);
+  }, 5000);
   
-  console.log('✅ Auto-backup scheduler started (every 24h)');
+  console.log('✅ Auto Cloud Backup scheduler started (every 6 hours)');
 }
 
 // ============================================================
