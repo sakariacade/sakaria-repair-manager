@@ -5,7 +5,7 @@ import {
   Cog, CheckCircle, PackageCheck, Banknote, Laptop, BellRing, Send, 
   Clock, ArrowRight, ArrowRightCircle, List, Kanban, MessageSquare, 
   FileText, Edit3, Trash2, Plus, Phone, UserPlus, Receipt, Save, X, Check, Printer,
-  Database, Sparkles, ShieldCheck
+  Database, Sparkles, ShieldCheck, Cloud, Wifi, Server, UploadCloud, Shield
 } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
@@ -145,14 +145,75 @@ export default function App() {
   const t = translations[lang] || translations.so;
 
   
-  // --- REAL BACKEND API SYNC ENGINE ---
-  const API_BASE = '/api';
+  // --- REAL BACKEND API SYNC & OFFLINE-FIRST ENGINE ---
+  const [serverUrl, setServerUrl] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sakaria_server_url');
+      if (saved) return saved.replace(/\/$/, '');
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return '/api';
+      }
+      if (/^192\.168\./.test(window.location.hostname)) {
+        return `http://${window.location.hostname}:3001/api`;
+      }
+    }
+    return localStorage.getItem('sakaria_custom_api') || 'https://sakaria-repair-api.onrender.com/api';
+  });
+
+  const API_BASE = serverUrl;
+  const [serverLatency, setServerLatency] = useState(null);
+  const [showServerModal, setShowServerModal] = useState(false);
+  const [serverModalInput, setServerModalInput] = useState(serverUrl);
   const [cloudSynced, setCloudSynced] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [auditLogsList, setAuditLogsList] = useState([]);
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [offlineQueueCount, setOfflineQueueCount] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('sakaria_offline_queue') || '[]').length;
+    } catch(e) { return 0; }
+  });
+
+  // Check health and ping server
+  const checkServerHealth = async () => {
+    try {
+      const start = performance.now();
+      const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3500) });
+      const latency = Math.round(performance.now() - start);
+      if (res.ok) {
+        setDbConnected(true);
+        setServerLatency(latency);
+        return true;
+      }
+    } catch(e) {}
+    setDbConnected(false);
+    setServerLatency(null);
+    return false;
+  };
+
+  // Sync pending offline tickets to backend
+  const syncOfflineQueue = async () => {
+    try {
+      const queue = JSON.parse(localStorage.getItem('sakaria_offline_queue') || '[]');
+      if (!queue.length || !auth?.token) return;
+      
+      const res = await fetch(`${API_BASE}/tickets/batch-sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth.token}` },
+        body: JSON.stringify({ tickets: queue })
+      });
+      if (res.ok) {
+        localStorage.removeItem('sakaria_offline_queue');
+        setOfflineQueueCount(0);
+        showToast(lang === 'so' ? '🔄 Tikidhyadii offline-ka ahaa waa la diray!' : '🔄 Offline tickets synced!', 'success');
+        fetchCloudData(false);
+      }
+    } catch(e) {}
+  };
 
   const fetchCloudData = async (isInitial = false) => {
-    if (!auth?.token || auth?.token?.startsWith('fallback_token_')) return;
+    if (!auth?.token) return;
     try {
       setIsSyncing(true);
       const res = await fetch(`${API_BASE}/tickets`, {
@@ -176,6 +237,9 @@ export default function App() {
             }
             return prev;
           });
+
+          // Also check if we have any offline queued items to sync
+          syncOfflineQueue();
         }
       }
     } catch (e) {
@@ -196,16 +260,28 @@ export default function App() {
 
   const forceCloudSync = () => {
     fetchCloudData(true);
+    checkServerHealth();
+    syncOfflineQueue();
     showToast(lang === 'so' ? '🔄 Xogta waa la cusbooneysiiyay' : '🔄 Synced Successfully!', 'success');
   };
 
   const pushToCloud = () => {}; // Dummy to prevent errors from old UI calls
 
+  // Background Health Check & Cloud Sync Loop
   useEffect(() => {
+    checkServerHealth();
     if (!auth?.token) return;
     fetchCloudData(true);
-    const interval = setInterval(() => fetchCloudData(false), 3000);
-    const handleFocus = () => fetchCloudData(false);
+
+    const interval = setInterval(() => {
+      checkServerHealth();
+      fetchCloudData(false);
+    }, 5000);
+
+    const handleFocus = () => {
+      checkServerHealth();
+      fetchCloudData(false);
+    };
     window.addEventListener('focus', handleFocus);
     window.addEventListener('visibilitychange', handleFocus);
     return () => {
@@ -213,7 +289,7 @@ export default function App() {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('visibilitychange', handleFocus);
     };
-  }, [auth]);
+  }, [auth, serverUrl]);
   
 
 
@@ -483,20 +559,35 @@ export default function App() {
           playSound.success();
           return;
         }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        if (err.error && err.error.includes('Amni: Isku-dayo badan')) {
+          showToast(err.error, 'error');
+          playSound.error();
+          return;
+        }
       }
     } catch (err) {
-      // Backend not reached (e.g. GitHub Pages or Mobile Web without running server)
+      // Backend offline or unreachable
     }
 
-    // 2. Fallback Login (Guarantees Mobile & GitHub Pages work 100% anytime!)
+    // 2. Fallback Offline Login (Zero plaintext passwords: SHA-256 Hash Comparison)
+    const hashPw = async (str) => {
+      try {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      } catch (e) { return ''; }
+    };
+
+    const pwHash = await hashPw(pw);
     let fallbackUser = null;
-    if (un === 'admin' && pw === 'Admin@Sakaria2026') {
+    if (un === 'admin' && pwHash === '979ec2ad57cc25f9092b135ed3fb534aa54b144d22cb9d8f0cab7c0f9e590359') {
       fallbackUser = { id: 1, username: 'admin', full_name: 'Admin (Sakaria Center)', role: 'admin' };
-    } else if (un === 'sakaria' && pw === 'Tech@Sakaria123') {
+    } else if (un === 'sakaria' && pwHash === 'cd9a1cb3b9855e64cb456e961269e17bac52af431e478a4a36347e766544eb7b') {
       fallbackUser = { id: 2, username: 'sakaria', full_name: 'Sakaria Dheere', role: 'technician' };
-    } else if (un === 'cabdiraxmaan' && pw === 'Tech@Sakaria123') {
+    } else if (un === 'cabdiraxmaan' && pwHash === 'cd9a1cb3b9855e64cb456e961269e17bac52af431e478a4a36347e766544eb7b') {
       fallbackUser = { id: 3, username: 'cabdiraxmaan', full_name: 'Cabdiraxmaan', role: 'technician' };
-    } else if (un === 'receptionist' && pw === 'Recep@Sakaria123') {
+    } else if (un === 'receptionist' && pwHash === '505b23273e1d21a4476d6f365585ae1fe08df02dcf420e7be1f11fc8572c731a') {
       fallbackUser = { id: 4, username: 'receptionist', full_name: 'Receptionist', role: 'receptionist' };
     }
 
@@ -504,7 +595,7 @@ export default function App() {
       const fallbackAuth = { token: 'fallback_token_' + Date.now(), user: fallbackUser };
       setAuth(fallbackAuth);
       localStorage.setItem('sakaria_auth', JSON.stringify(fallbackAuth));
-      showToast(lang === 'so' ? 'Waa lagalay ✅' : 'Logged in successfully ✅', 'success');
+      showToast(lang === 'so' ? 'Waa lagalay (Offline Mode) ✅' : 'Logged in (Offline Mode) ✅', 'success');
       playSound.success();
     } else {
       showToast(lang === 'so' ? 'Magaca ama Password-ka ma saxana!' : 'Invalid username or password!', 'error');
@@ -515,7 +606,7 @@ export default function App() {
   const handleLogout = () => {
     setAuth(null);
     localStorage.removeItem('sakaria_auth');
-    setTickets([]);
+    showToast(lang === 'so' ? 'Waa laga baxay' : 'Logged out', 'info');
   };
 
   // Fetch Users (Admin only)
@@ -619,11 +710,46 @@ export default function App() {
           issue: '', techNotes: '', status: 'Received', technician: 'Sakaria', labor: 20, parts: 0, discount: 0, paid: 0, method: 'Cash'
         });
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         showToast(err.error || 'Failed to save', 'error');
       }
     } catch(err) {
-      showToast('Network Error - Server ma socdo', 'error');
+      // 🛡️ OFFLINE RESILIENCE: Save locally so data is NEVER lost!
+      const isNew = !editingTicket;
+      const total = labor + parts - discount;
+      const balance = total - paid;
+      const ticketId = editingTicket ? editingTicket.id : `SRM-OFF-${Date.now().toString().slice(-4)}`;
+      
+      const offlineTicket = {
+        id: ticketId,
+        customer: { name: payload.customer.name, phone: payload.customer.phone, email: '' },
+        device: { ...payload.device },
+        issue: payload.issue,
+        techNotes: payload.techNotes,
+        status: payload.status,
+        technician: payload.technicianName || 'Sakaria',
+        pricing: { labor, parts, discount, total, paid, balance, method: payload.pricing.method },
+        createdAt: editingTicket ? editingTicket.createdAt : new Date().toISOString(),
+        offlinePending: true
+      };
+
+      setTickets(prev => isNew ? [offlineTicket, ...prev] : prev.map(t => t.id === ticketId ? offlineTicket : t));
+      
+      try {
+        const queue = JSON.parse(localStorage.getItem('sakaria_offline_queue') || '[]');
+        queue.push(offlineTicket);
+        localStorage.setItem('sakaria_offline_queue', JSON.stringify(queue));
+        setOfflineQueueCount(queue.length);
+      } catch (e) {}
+
+      showToast(lang === 'so' ? 'Waa lagu keydiyay taleefankaaga (Offline). Marka server-ka la helo si toos ah ayaa loo dirayaa! ✅' : 'Saved locally (Offline Mode). Will auto-sync when connected! ✅', 'success');
+      playSound.success();
+      setIsTicketModalOpen(false);
+      setEditingTicket(null);
+      setFormData({
+        custName: '', custPhone: '', deviceType: 'Laptop', brandModel: '', serial: '', accessories: '', password: '',
+        issue: '', techNotes: '', status: 'Received', technician: 'Sakaria', labor: 20, parts: 0, discount: 0, paid: 0, method: 'Cash'
+      });
     }
   };
 
@@ -681,9 +807,118 @@ export default function App() {
 
 
 
-  // Data Export / Reset
+  const importInputRef = useRef(null);
+
+  // Trigger Immediate Cloud Sync to GitHub
+  const triggerCloudSyncNow = async () => {
+    try {
+      showToast(lang === 'so' ? '☁️ Xogta waxaa loo dirayaa GitHub Cloud...' : '☁️ Syncing to GitHub Cloud...', 'info');
+      const res = await fetch(`${API_BASE}/backup/cloud-sync`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${auth?.token}` }
+      });
+      if (res.ok) {
+        showToast(lang === 'so' ? '✅ Database-ka waxaa lagu kaydiyay GitHub Cloud!' : '✅ Database backed up to GitHub Cloud!', 'success');
+        playSound.success();
+      } else {
+        showToast(lang === 'so' ? '❌ Cloud backup kuma guulaysan' : 'Cloud backup failed', 'error');
+      }
+    } catch(e) {
+      showToast('Server offline', 'error');
+    }
+  };
+
+  // Download SQLite .db File directly
+  const downloadSqliteDb = () => {
+    if (auth?.token) {
+      window.open(`${API_BASE}/backup/download-db`, '_blank');
+      showToast(lang === 'so' ? '💾 SQLite Database (.db) waa la soo dejinayaa...' : 'Downloading SQLite DB file...', 'info');
+    } else {
+      showToast(lang === 'so' ? 'Fadlan soo gal marka hore' : 'Please login first', 'error');
+    }
+  };
+
+  // Full System JSON Export
+  const exportFullBackup = async () => {
+    try {
+      if (dbConnected && auth?.token) {
+        const res = await fetch(`${API_BASE}/backup/export-full`, {
+          headers: { 'Authorization': `Bearer ${auth.token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Sakaria_Full_System_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast(lang === 'so' ? 'Xogta oo dhan (Server + DB) waa la soo dejiyay! ✅' : 'Full system backup downloaded! ✅', 'success');
+          return;
+        }
+      }
+    } catch(e) {}
+    // Local fallback export
+    exportBackup();
+  };
+
+  // Full System JSON Import
+  const importFullBackup = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!parsed || !parsed.repairs) {
+        showToast(lang === 'so' ? 'Faylku ma aha backup sax ah!' : 'Invalid backup file!', 'error');
+        return;
+      }
+      if (dbConnected && auth?.token) {
+        const res = await fetch(`${API_BASE}/backup/import-full`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth.token}` },
+          body: JSON.stringify(parsed)
+        });
+        if (res.ok) {
+          showToast(lang === 'so' ? 'Xogtii dib ayaa loo soo celiyay! ✅' : 'Backup restored successfully! ✅', 'success');
+          fetchCloudData(true);
+          return;
+        }
+      }
+      // Offline fallback restore
+      if (Array.isArray(parsed.repairs) && parsed.repairs.length) {
+        setTickets(parsed.repairs);
+        localStorage.setItem('sakaria_tickets', JSON.stringify(parsed.repairs));
+        showToast(lang === 'so' ? 'Xogtii maxaliga ahayd dib ayaa loo soo celiyay! ✅' : 'Restored locally! ✅', 'success');
+      }
+    } catch(err) {
+      showToast('Error reading file: ' + err.message, 'error');
+    }
+  };
+
+  // Fetch Security Audit Logs
+  const fetchAuditLogs = async () => {
+    if (!auth?.token || auth?.user?.role !== 'admin') return;
+    try {
+      const res = await fetch(`${API_BASE}/audit-logs?limit=50`, {
+        headers: { 'Authorization': `Bearer ${auth.token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAuditLogsList(data.logs || []);
+        setShowAuditModal(true);
+      } else {
+        showToast('Failed to fetch audit logs', 'error');
+      }
+    } catch(e) {
+      showToast('Server offline', 'error');
+    }
+  };
+
+  // Simple local export
   const exportBackup = () => {
-    const payload = { exportedAt: new Date().toISOString(), version: '2.5-react-db', settings, tickets };
+    const payload = { exportedAt: new Date().toISOString(), version: '4.0.0', settings, tickets };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -698,7 +933,13 @@ export default function App() {
     if (window.confirm(lang === 'so' ? 'Dib ma ugu celinaa xogtii tusaalaha ahayd?' : 'Reset to sample data?')) {
       setTickets(DEFAULT_TICKETS);
       setSettings(DEFAULT_SETTINGS);
-      fetch('/api/reset', { method: 'POST' }).catch(err => console.error("Database reset error:", err));
+      if (auth?.token) {
+        fetch(`${API_BASE}/reset`, { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth.token}` },
+          body: JSON.stringify({ confirmText: "RESET_ALL_DATA" })
+        }).catch(err => console.error("Database reset error:", err));
+      }
       showToast(lang === 'so' ? 'Xogtii hore dib ayaa loo soo celiyay' : 'Reset to sample data', 'info');
     }
   };
@@ -892,24 +1133,83 @@ export default function App() {
                 <LogOut className="w-4 h-4" />
               </button>
 
-              {/* Backup / Settings Menu */}
+              {/* Data & Security Center Menu */}
               <div className="relative">
                 <button 
                   onClick={() => setIsSettingsMenuOpen(!isSettingsMenuOpen)}
                   className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+                  title="Xogta, Amniga & Server-ka"
                 >
                   <Settings className="w-4 h-4" />
                 </button>
                 {isSettingsMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-1 text-sm z-50 animate-scale-up">
+                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 text-sm z-50 animate-scale-up">
+                    <div className="px-4 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-700/60 mb-1">
+                      {lang === 'so' ? '🗄️ Database & Cloud' : '🗄️ Database & Cloud'}
+                    </div>
+
+                    {/* Server Connection Modal Button */}
                     <button 
-                      onClick={() => { exportBackup(); setIsSettingsMenuOpen(false); }}
+                      onClick={() => { setShowServerModal(true); setIsSettingsMenuOpen(false); }}
+                      className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Server className="w-4 h-4 text-blue-500" />
+                        <span className="font-semibold">{lang === 'so' ? 'Xiriirka Server-ka' : 'Server Connection'}</span>
+                      </div>
+                      <span className={`w-2 h-2 rounded-full ${dbConnected ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                    </button>
+
+                    {/* Immediate Cloud Sync */}
+                    <button 
+                      onClick={() => { triggerCloudSyncNow(); setIsSettingsMenuOpen(false); }}
+                      className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold"
+                    >
+                      <Cloud className="w-4 h-4" />
+                      <span>{lang === 'so' ? 'Ku Dir GitHub Cloud Hadda' : 'Sync to Cloud Now'}</span>
+                    </button>
+
+                    {/* Download Full JSON Backup */}
+                    <button 
+                      onClick={() => { exportFullBackup(); setIsSettingsMenuOpen(false); }}
                       className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
                     >
                       <Download className="w-4 h-4 text-indigo-500" />
-                      <span>{t.exportBackup}</span>
+                      <span>{lang === 'so' ? 'Soo Dejiso Backup Buuxa (JSON)' : 'Export Full Backup'}</span>
                     </button>
+
+                    {/* Restore / Import Backup */}
+                    <button 
+                      onClick={() => { importInputRef.current?.click(); setIsSettingsMenuOpen(false); }}
+                      className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold"
+                    >
+                      <UploadCloud className="w-4 h-4" />
+                      <span>{lang === 'so' ? 'Dib U Soo Celi Backup (Import)' : 'Restore Backup'}</span>
+                    </button>
+
+                    {/* Download SQLite DB File */}
+                    <button 
+                      onClick={() => { downloadSqliteDb(); setIsSettingsMenuOpen(false); }}
+                      className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 text-purple-600 dark:text-purple-400"
+                    >
+                      <Database className="w-4 h-4" />
+                      <span>{lang === 'so' ? 'Soo Dejiso SQLite File (.db)' : 'Download SQLite DB'}</span>
+                    </button>
+
+                    {/* Security Audit Logs (Admin Only) */}
+                    {auth?.user?.role === 'admin' && (
+                      <button 
+                        onClick={() => { fetchAuditLogs(); setIsSettingsMenuOpen(false); }}
+                        className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 text-slate-700 dark:text-slate-200"
+                      >
+                        <Shield className="w-4 h-4 text-emerald-500" />
+                        <span>{lang === 'so' ? 'Diiwaanka Amniga (Audit)' : 'Security Audit Logs'}</span>
+                      </button>
+                    )}
+
                     <div className="border-t border-slate-100 dark:border-slate-700 my-1"></div>
+
+                    {/* Reset Sample */}
                     <button 
                       onClick={() => { resetData(); setIsSettingsMenuOpen(false); }}
                       className="w-full text-left px-4 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2"
@@ -2397,6 +2697,201 @@ export default function App() {
 
         </div>
       </nav>
+
+      {/* Hidden file input for 1-click JSON backup restore */}
+      <input 
+        type="file" 
+        ref={importInputRef} 
+        onChange={importFullBackup} 
+        accept=".json" 
+        className="hidden" 
+      />
+
+      {/* 🌐 SERVER CONNECTION & CLOUD CONFIGURATION MODAL */}
+      {showServerModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200 dark:border-slate-700 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700">
+              <div className="flex items-center gap-2">
+                <Server className="w-5 h-5 text-indigo-500" />
+                <h3 className="text-lg font-bold">{lang === 'so' ? '🌐 Xiriirka Server-ka & Cloud-ka' : '🌐 Server & Cloud Connection'}</h3>
+              </div>
+              <button onClick={() => setShowServerModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-4">
+              {/* Status card */}
+              <div className={`p-4 rounded-xl border flex items-center justify-between ${dbConnected ? 'bg-emerald-50/70 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800' : 'bg-amber-50/70 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800'}`}>
+                <div className="flex items-center gap-3">
+                  <span className={`w-3 h-3 rounded-full ${dbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+                  <div>
+                    <div className="font-bold text-sm">
+                      {dbConnected ? (lang === 'so' ? '🟢 Server-ku Wuu Shaqaynayaa (Online)' : '🟢 Server Connected (Online)') : (lang === 'so' ? '🟡 Offline Mode (Local Storage)' : '🟡 Offline Mode (Local Storage)')}
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      {dbConnected && serverLatency ? `Latency: ${serverLatency}ms • Cloud Sync Ready` : (lang === 'so' ? 'Tikidhyada waxaa lagu keydinayaa qalabkaaga' : 'Tickets safely stored in local memory')}
+                    </div>
+                  </div>
+                </div>
+                {offlineQueueCount > 0 && (
+                  <span className="text-xs font-bold px-2.5 py-1 bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 rounded-full">
+                    {offlineQueueCount} queued
+                  </span>
+                )}
+              </div>
+
+              {/* Server Presets */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  {lang === 'so' ? 'Dooro Server (Quick Presets):' : 'Select Server Preset:'}
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <button 
+                    onClick={() => setServerModalInput('https://sakaria-repair-api.onrender.com/api')}
+                    className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 text-left transition flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50"
+                  >
+                    <Cloud className="w-4 h-4 text-blue-500 shrink-0" />
+                    <div>
+                      <div className="font-bold">☁️ Render Cloud API</div>
+                      <div className="text-[10px] text-slate-400">24/7 Online meel kasta</div>
+                    </div>
+                  </button>
+                  <button 
+                    onClick={() => setServerModalInput('/api')}
+                    className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 text-left transition flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50"
+                  >
+                    <Laptop className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <div>
+                      <div className="font-bold">💻 Localhost (Laptop)</div>
+                      <div className="text-[10px] text-slate-400">http://localhost:3001</div>
+                    </div>
+                  </button>
+                  <button 
+                    onClick={() => setServerModalInput('http://192.168.100.36:3001/api')}
+                    className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 text-left transition flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50 sm:col-span-2"
+                  >
+                    <Wifi className="w-4 h-4 text-amber-500 shrink-0" />
+                    <div>
+                      <div className="font-bold">📶 Wi-Fi Dukaanka</div>
+                      <div className="text-[10px] text-slate-400">http://192.168.100.36:3001/api</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Input URL */}
+              <div>
+                <label className="block text-sm font-semibold mb-1">
+                  {lang === 'so' ? 'Cinwaanka Server-ka (API Base URL):' : 'Server API Base URL:'}
+                </label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={serverModalInput} 
+                    onChange={e => setServerModalInput(e.target.value)}
+                    placeholder="https://your-api.onrender.com/api ama /api"
+                    className="flex-1 p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button 
+                    onClick={async () => {
+                      showToast('Testing connection...', 'info');
+                      try {
+                        const s = performance.now();
+                        const r = await fetch(`${serverModalInput.trim().replace(/\/$/, '')}/health`, { signal: AbortSignal.timeout(4000) });
+                        const ms = Math.round(performance.now() - s);
+                        if (r.ok) {
+                          showToast(`✅ Guul! Server-ku waa Online (${ms}ms)`, 'success');
+                          playSound.success();
+                        } else {
+                          showToast('❌ Server-ka lama helin (Status ' + r.status + ')', 'error');
+                        }
+                      } catch(e) {
+                        showToast('❌ Isku-xirka wuu fashilmay', 'error');
+                      }
+                    }}
+                    className="px-3 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 rounded-xl font-bold text-xs"
+                  >
+                    Tijaabi
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+              <button 
+                onClick={() => {
+                  const clean = serverModalInput.trim().replace(/\/$/, '');
+                  setServerUrl(clean);
+                  localStorage.setItem('sakaria_server_url', clean);
+                  setShowServerModal(false);
+                  showToast('Cinwaanka server-ka waa la beddelay! ✅', 'success');
+                  setTimeout(() => { checkServerHealth(); fetchCloudData(true); }, 200);
+                }}
+                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition text-sm shadow-md"
+              >
+                {lang === 'so' ? 'Keydi & Isku Xir' : 'Save & Connect'}
+              </button>
+              <button 
+                onClick={() => setShowServerModal(false)}
+                className="px-4 py-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 rounded-xl font-bold text-sm"
+              >
+                {lang === 'so' ? 'Ka Bax' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🛡️ SECURITY AUDIT LOGS MODAL */}
+      {showAuditModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl p-6 border border-slate-200 dark:border-slate-700 max-h-[85vh] flex flex-col animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                <h3 className="text-lg font-bold">{lang === 'so' ? '🛡️ Diiwaanka Amniga & Dhacdooyinka (Security Audit Logs)' : '🛡️ Security Audit Logs'}</h3>
+              </div>
+              <button onClick={() => setShowAuditModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-3 space-y-2 text-xs">
+              {auditLogsList.map((log, idx) => (
+                <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700 rounded-xl flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-mono text-[10px]">
+                        {log.action}
+                      </span>
+                      <span>@{log.username || 'System'}</span>
+                      <span className="text-slate-400 font-normal text-[11px] font-mono">({log.role || 'N/A'})</span>
+                    </div>
+                    <div className="text-slate-500 dark:text-slate-400 mt-1">
+                      {log.details || log.entity || 'No details'}
+                    </div>
+                  </div>
+                  <div className="text-right text-slate-400 text-[10px]">
+                    <div>{new Date(log.created_at).toLocaleDateString()}</div>
+                    <div>{new Date(log.created_at).toLocaleTimeString()}</div>
+                  </div>
+                </div>
+              ))}
+              {auditLogsList.length === 0 && (
+                <div className="text-center py-8 text-slate-400">Diiwaanka amni waa madhan yahay.</div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-700 text-right">
+              <button onClick={() => setShowAuditModal(false)} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 rounded-xl font-bold text-xs">
+                Xir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
