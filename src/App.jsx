@@ -5,7 +5,8 @@ import {
   Cog, CheckCircle, PackageCheck, Banknote, Laptop, BellRing, Send, 
   Clock, ArrowRight, ArrowRightCircle, List, Kanban, MessageSquare, 
   FileText, Edit3, Trash2, Plus, Phone, UserPlus, Receipt, Save, X, Check, Printer,
-  Database, Sparkles, ShieldCheck, Cloud, Wifi, Server, UploadCloud, Shield
+  Database, Sparkles, ShieldCheck, Cloud, Wifi, Server, UploadCloud, Shield,
+  Eye, EyeOff, Lock, KeyRound, ShieldAlert
 } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
@@ -88,6 +89,11 @@ export default function App() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [userForm, setUserForm] = useState({ username: '', password: '', full_name: '', role: 'technician' });
   const [editingUser, setEditingUser] = useState(null);
+  
+  // Security & Sensitive Data State
+  const [showDevicePassword, setShowDevicePassword] = useState(false);
+  const [showForcePasswordModal, setShowForcePasswordModal] = useState(false);
+  const [forcePassForm, setForcePassForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   
   // Data
   const [tickets, setTickets] = useState(() => {
@@ -555,8 +561,13 @@ export default function App() {
         if (data && data.token && data.user) {
           setAuth({ token: data.token, user: data.user });
           localStorage.setItem('sakaria_auth', JSON.stringify({ token: data.token, user: data.user }));
-          showToast(lang === 'so' ? 'Waa lagalay ✅' : 'Login successful ✅', 'success');
-          playSound.success();
+          if (data.user.mustChangePassword) {
+            setShowForcePasswordModal(true);
+            showToast(lang === 'so' ? '🔐 Fadlan cusboonaysii Password-kaaga hore' : '🔐 Please change your default password', 'info');
+          } else {
+            showToast(lang === 'so' ? 'Waa lagalay ✅' : 'Login successful ✅', 'success');
+            playSound.success();
+          }
           return;
         }
       } else {
@@ -572,10 +583,50 @@ export default function App() {
     }
   };
 
+  const handleForcePasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (forcePassForm.newPassword !== forcePassForm.confirmPassword) {
+      showToast(lang === 'so' ? 'Password-yada cusub isma leha!' : 'New passwords do not match!', 'error');
+      playSound.error();
+      return;
+    }
+    if (forcePassForm.newPassword.length < 8) {
+      showToast(lang === 'so' ? 'Password-ka cusub waa inuu ka koobnaadaa ugu yaraan 8 xaraf!' : 'Password must be at least 8 characters!', 'error');
+      playSound.error();
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth.token}` },
+        body: JSON.stringify({
+          currentPassword: forcePassForm.currentPassword,
+          newPassword: forcePassForm.newPassword
+        })
+      });
+      if (res.ok) {
+        const updatedAuth = { ...auth, user: { ...auth.user, mustChangePassword: false } };
+        setAuth(updatedAuth);
+        localStorage.setItem('sakaria_auth', JSON.stringify(updatedAuth));
+        setShowForcePasswordModal(false);
+        setForcePassForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        showToast(lang === 'so' ? 'Password-ka si guul leh ayaa loo beddelay! Koontadaadu waa 100% ammaan ✅' : 'Password changed successfully! ✅', 'success');
+        playSound.success();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || (lang === 'so' ? 'Password-ka hadda qaldan!' : 'Current password incorrect!'), 'error');
+        playSound.error();
+      }
+    } catch (err) {
+      showToast(lang === 'so' ? 'Khalad ayaa dhacay marka password-ka la beddelayay' : 'Error updating password', 'error');
+      playSound.error();
+    }
+  };
+
   const handleDemoLogin = () => {
     const demoAuth = { token: 'demo_token_preview', user: { id: 'demo', username: 'demo', full_name: 'Guest / Demo Viewer', role: 'admin', isDemo: true } };
     setAuth(demoAuth);
-    showToast(lang === 'so' ? 'Waa lagalay (Habka Tusaalaha / Demo Mode)' : 'Logged in (Demo Mode)', 'info');
+    showToast(lang === 'so' ? 'Waa lagalay (Habka Tusaalaha / Demo Mode - Akhri Keliya)' : 'Logged in (Demo Mode - Read Only)', 'info');
   };
   
   const handleLogout = () => {
@@ -1124,6 +1175,19 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 font-sans transition-colors duration-200">
       
+      {/* Demo Mode Notice Banner */}
+      {auth?.user?.isDemo && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-900 dark:text-amber-200 px-4 py-2 text-xs font-semibold flex items-center justify-between z-40">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>{lang === 'so' ? '👀 Habka Tusaalaha (Demo Mode - Akhri Keliya): Waxaad dhex mushaaxeysaa xog tusaale ah. Xogta server-ka lama beddeli karo.' : '👀 Demo Mode (Read-Only): You are exploring sample data. Live server mutations are disabled.'}</span>
+          </div>
+          <button onClick={handleLogout} className="underline text-[11px] text-amber-700 dark:text-amber-300 hover:text-amber-900 font-bold">
+            {lang === 'so' ? 'Soo Gal Koonto Dhab ah' : 'Login with real account'}
+          </button>
+        </div>
+      )}
+
       {/* HEADER & TOPBAR (Glassmorphic) */}
       <header className="bg-white/85 dark:bg-[#0f172a]/85 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 sticky top-0 z-30 shadow-sm shadow-slate-900/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -2431,13 +2495,23 @@ export default function App() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1.5">Password / PIN</label>
+                    <label className="block text-xs font-bold mb-1.5 flex items-center justify-between">
+                      <span>Password / PIN (Qarsoon)</span>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowDevicePassword(!showDevicePassword)}
+                        className="text-[11px] text-indigo-500 hover:text-indigo-600 font-semibold flex items-center gap-1 focus:outline-none"
+                      >
+                        {showDevicePassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        {showDevicePassword ? (lang === 'so' ? 'Qari' : 'Hide') : (lang === 'so' ? 'Muuji' : 'Show')}
+                      </button>
+                    </label>
                     <input 
-                      type="text" 
+                      type={showDevicePassword ? "text" : "password"} 
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder="e.g. 1234 or None"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl"
+                      placeholder="••••••••"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl font-mono text-sm tracking-wider"
                     />
                   </div>
                 </div>
@@ -2995,6 +3069,75 @@ export default function App() {
                 Xir
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔐 MANDATORY FIRST-LOGIN PASSWORD CHANGE MODAL */}
+      {(showForcePasswordModal || auth?.user?.mustChangePassword) && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-md p-6 sm:p-7 border border-amber-500/50 animate-scale-up text-slate-900 dark:text-white relative">
+            <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-700">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0">
+                <KeyRound className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold">{lang === 'so' ? '🔐 Beddel Password-kaaga Hore' : '🔐 Set Your New Password'}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {lang === 'so' ? 'Waa markii kuugu horreysay ee aad gasho. Amniga dartiis waa in aad sameysataa eray-sir cusub.' : 'For security, you must update the default password before proceeding.'}
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleForcePasswordSubmit} className="space-y-4 py-4 text-xs">
+              <div>
+                <label className="block text-xs font-bold mb-1.5">{lang === 'so' ? 'Password-kii Hore (Default) *' : 'Current Password *'}</label>
+                <input 
+                  type="password"
+                  required
+                  value={forcePassForm.currentPassword}
+                  onChange={e => setForcePassForm({ ...forcePassForm, currentPassword: e.target.value })}
+                  placeholder="Geli eray-sirka aad hadda ku soo gashay..."
+                  className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-1.5">{lang === 'so' ? 'Password-ka Cusub (Ugu yaraan 8 xaraf) *' : 'New Password (Min 8 chars) *'}</label>
+                <input 
+                  type="password"
+                  required
+                  minLength={8}
+                  value={forcePassForm.newPassword}
+                  onChange={e => setForcePassForm({ ...forcePassForm, newPassword: e.target.value })}
+                  placeholder="Sameyso password cusub oo adag..."
+                  className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-1.5">{lang === 'so' ? 'Xaqiiji Password-ka Cusub *' : 'Confirm New Password *'}</label>
+                <input 
+                  type="password"
+                  required
+                  minLength={8}
+                  value={forcePassForm.confirmPassword}
+                  onChange={e => setForcePassForm({ ...forcePassForm, confirmPassword: e.target.value })}
+                  placeholder="Ku celi password-ka cusub..."
+                  className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button 
+                  type="submit"
+                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 text-sm"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>{lang === 'so' ? 'Kaydi Password-ka Cusub' : 'Save & Secure Account'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

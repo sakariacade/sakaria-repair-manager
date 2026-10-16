@@ -19,7 +19,7 @@ export const DEFAULT_TICKETS = [
       brandModel: "HP EliteBook 840 G6",
       serial: "5CD9283XYZ",
       accessories: "Original 65W Charger, Laptop Bag",
-      password: "None"
+      password: ""
     },
     issue: "Shaashadda ayaa dildilaacday oo ma shidmayso (Broken screen, no display)",
     techNotes: "Replaced display panel with OEM FHD IPS screen. Tested resolution, brightness and webcam.",
@@ -49,7 +49,7 @@ export const DEFAULT_TICKETS = [
       brandModel: "Dell XPS 13 9300",
       serial: "8HG729K01",
       accessories: "Type-C Charger",
-      password: "1234"
+      password: "••••••••"
     },
     issue: "Batari bararay oo aan koronto haysaneyn (Battery swelling, not charging)",
     techNotes: "Battery replaced with OEM Dell battery. Fan cleaned and thermal paste reapplied.",
@@ -79,7 +79,7 @@ export const DEFAULT_TICKETS = [
       brandModel: "Apple MacBook Air M2",
       serial: "C02F9382Q6N",
       accessories: "MagSafe Cable",
-      password: "None"
+      password: ""
     },
     issue: "Kafee ku daatay, badhanka shididda iyo furayaasha keyboard-ka qaar ayaa dhegaya",
     techNotes: "Ultrasonic cleaning completed for motherboard; keyboard membrane flush in progress.",
@@ -109,7 +109,7 @@ export const DEFAULT_TICKETS = [
       brandModel: "Lenovo ThinkPad T14",
       serial: "PF392810X",
       accessories: "Lenovo 65W Charger",
-      password: "9988"
+      password: "••••••••"
     },
     issue: "Aad buu u gaabiyaa (Very slow), wuxuu wataa Hard Drive duug ah",
     techNotes: "Upgraded 1TB HDD to 512GB NVMe M.2 SSD. Fresh Windows 11 Pro installed.",
@@ -139,7 +139,7 @@ export const DEFAULT_TICKETS = [
       brandModel: "Asus TUF Gaming F15",
       serial: "M8N0CX04921",
       accessories: "Heavy 200W Charger, Mouse",
-      password: "gamer"
+      password: "••••••••"
     },
     issue: "Kuleyl badan (Overheating) iyo marawaxada oo qeylisa, ciyaaraha wuu ka damayaa",
     techNotes: "Dual fan cleaning, Arctic MX-4 thermal paste replacement, copper heat pipe flushed.",
@@ -169,7 +169,7 @@ export const DEFAULT_TICKETS = [
       brandModel: "Acer Aspire 5 A515",
       serial: "NXA85EK002",
       accessories: "Adapter",
-      password: "None"
+      password: ""
     },
     issue: "Galka dambe iyo laab-laabaha (Hinges) ayaa jabay marka la furayo",
     techNotes: "Fabricating brass hinge mount anchors with industrial epoxy adhesive.",

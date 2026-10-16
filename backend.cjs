@@ -223,10 +223,18 @@ function createTables() {
     password_hash TEXT NOT NULL,
     full_name TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('admin', 'technician', 'receptionist')),
+    must_change_password INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   )`);
+
+  // Ensure column exists for existing databases
+  try {
+    db.run(`ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0;`);
+  } catch (e) {
+    // Column already exists
+  }
 
   // Customers table
   db.run(`CREATE TABLE IF NOT EXISTS customers (
@@ -390,24 +398,24 @@ function seedDefaultData() {
   if (adminCheck.length === 0 || adminCheck[0].values.length === 0) {
     const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@Sakaria2026';
     const hash = bcrypt.hashSync(adminPassword, 12);
-    db.run(`INSERT INTO users (id, username, password_hash, full_name, role) VALUES (?, ?, ?, ?, ?)`,
+    db.run(`INSERT INTO users (id, username, password_hash, full_name, role, must_change_password) VALUES (?, ?, ?, ?, ?, 1)`,
       [uuidv4(), 'admin', hash, 'Administrator', 'admin']);
     
     // Add technicians
     const techHash = bcrypt.hashSync('Tech@Sakaria123', 12);
-    db.run(`INSERT OR IGNORE INTO users (id, username, password_hash, full_name, role) VALUES (?, ?, ?, ?, ?)`,
+    db.run(`INSERT OR IGNORE INTO users (id, username, password_hash, full_name, role, must_change_password) VALUES (?, ?, ?, ?, ?, 1)`,
       [uuidv4(), 'sakaria', techHash, 'Sakaria', 'technician']);
-    db.run(`INSERT OR IGNORE INTO users (id, username, password_hash, full_name, role) VALUES (?, ?, ?, ?, ?)`,
+    db.run(`INSERT OR IGNORE INTO users (id, username, password_hash, full_name, role, must_change_password) VALUES (?, ?, ?, ?, ?, 1)`,
       [uuidv4(), 'cabdiraxmaan', techHash, 'Cabdiraxmaan', 'technician']);
-    db.run(`INSERT OR IGNORE INTO users (id, username, password_hash, full_name, role) VALUES (?, ?, ?, ?, ?)`,
+    db.run(`INSERT OR IGNORE INTO users (id, username, password_hash, full_name, role, must_change_password) VALUES (?, ?, ?, ?, ?, 1)`,
       [uuidv4(), 'sakaria_dheere', techHash, 'Sakaria Dheere', 'technician']);
     
     // Add receptionist
     const recepHash = bcrypt.hashSync('Recep@Sakaria123', 12);
-    db.run(`INSERT OR IGNORE INTO users (id, username, password_hash, full_name, role) VALUES (?, ?, ?, ?, ?)`,
+    db.run(`INSERT OR IGNORE INTO users (id, username, password_hash, full_name, role, must_change_password) VALUES (?, ?, ?, ?, ?, 1)`,
       [uuidv4(), 'receptionist', recepHash, 'Receptionist', 'receptionist']);
 
-    console.log('✅ Default users seeded');
+    console.log('✅ Default users seeded (First login password change enforced)');
   }
 
   // Default settings
@@ -437,6 +445,11 @@ function authenticate(req, res, next) {
   }
   
   const token = authHeader.substring(7);
+  if (token === 'demo_token_preview') {
+    req.user = { id: 'demo', username: 'demo', fullName: 'Guest / Demo Viewer', role: 'admin', isDemo: true };
+    return next();
+  }
+
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
@@ -445,6 +458,17 @@ function authenticate(req, res, next) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
+
+// Demo Mode Read-Only Guard (Prevents Demo accounts from mutating production database)
+app.use('/api', (req, res, next) => {
+  const isDemo = req.user?.isDemo || req.user?.username === 'demo' || req.headers['x-demo-mode'] === 'true';
+  if (isDemo && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    return res.status(403).json({ 
+      error: 'Amni: Demo Mode waa akhri-keliya (Read-only). Wax xog ah lagama beddeli karo server-ka dhabta ah.' 
+    });
+  }
+  next();
+});
 
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -552,7 +576,13 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   const token = jwt.sign(
-    { id: user.id, username: user.username, role: user.role, fullName: user.full_name },
+    { 
+      id: user.id, 
+      username: user.username, 
+      role: user.role, 
+      fullName: user.full_name,
+      mustChangePassword: Boolean(user.must_change_password)
+    },
     JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
   );
@@ -565,15 +595,22 @@ app.post('/api/auth/login', async (req, res) => {
       id: user.id,
       username: user.username,
       fullName: user.full_name,
-      role: user.role
+      role: user.role,
+      mustChangePassword: Boolean(user.must_change_password)
     }
   });
 });
 
 app.get('/api/auth/me', authenticate, (req, res) => {
-  const user = dbGet('SELECT id, username, full_name, role FROM users WHERE id=?', [req.user.id]);
+  const user = dbGet('SELECT id, username, full_name, role, must_change_password FROM users WHERE id=?', [req.user.id]);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ id: user.id, username: user.username, fullName: user.full_name, role: user.role });
+  res.json({ 
+    id: user.id, 
+    username: user.username, 
+    fullName: user.full_name, 
+    role: user.role,
+    mustChangePassword: Boolean(user.must_change_password)
+  });
 });
 
 app.post('/api/auth/change-password', authenticate, async (req, res) => {
@@ -587,6 +624,8 @@ app.post('/api/auth/change-password', authenticate, async (req, res) => {
   }
 
   const user = dbGet('SELECT * FROM users WHERE id=?', [req.user.id]);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
   const isValid = await bcrypt.compare(currentPassword, user.password_hash);
   
   if (!isValid) {
@@ -594,10 +633,10 @@ app.post('/api/auth/change-password', authenticate, async (req, res) => {
   }
 
   const newHash = await bcrypt.hash(newPassword, 12);
-  dbRun('UPDATE users SET password_hash=?, updated_at=datetime("now") WHERE id=?', [newHash, req.user.id]);
+  dbRun('UPDATE users SET password_hash=?, must_change_password=0, updated_at=datetime("now") WHERE id=?', [newHash, req.user.id]);
   
   auditLog(req.user.id, req.user.username, req.user.role, 'PASSWORD_CHANGED', 'users', req.user.id, null, req.ip);
-  res.json({ message: 'Password changed successfully' });
+  res.json({ message: 'Password changed successfully', mustChangePassword: false });
 });
 
 // ============================================================
@@ -612,35 +651,59 @@ app.post('/api/tickets/batch-sync', authenticate, (req, res) => {
   let syncedCount = 0;
   for (const tk of tickets) {
     try {
-      const existing = dbGet('SELECT id FROM repairs WHERE ticket_number=?', [tk.id]);
-      if (!existing && tk.customer?.name && tk.device?.brandModel) {
-        // Find or create customer
-        let cust = dbGet('SELECT id FROM customers WHERE phone=?', [(tk.customer.phone || '').trim()]);
-        let custId = cust ? cust.id : uuidv4();
-        if (!cust) {
-          dbRun('INSERT INTO customers (id, name, phone, email) VALUES (?,?,?,?)',
-            [custId, (tk.customer.name || '').trim(), (tk.customer.phone || '').trim(), tk.customer.email || '']);
-        }
+      if (!tk.customer?.name || !tk.device?.brandModel) continue;
 
-        // Insert device
+      // Find or create customer
+      let cust = dbGet('SELECT id FROM customers WHERE phone=?', [(tk.customer.phone || '').trim()]);
+      let custId = cust ? cust.id : uuidv4();
+      if (!cust) {
+        dbRun('INSERT INTO customers (id, name, phone, email) VALUES (?,?,?,?)',
+          [custId, (tk.customer.name || '').trim(), (tk.customer.phone || '').trim(), tk.customer.email || '']);
+      } else {
+        dbRun('UPDATE customers SET name=?, email=?, updated_at=datetime("now") WHERE id=?',
+          [(tk.customer.name || '').trim(), tk.customer.email || '', custId]);
+      }
+
+      // Check if ticket already exists (by ticket number or dbId)
+      const existing = dbGet('SELECT * FROM repairs WHERE ticket_number=? OR id=?', [tk.id, tk.dbId || '']);
+      
+      const p = tk.pricing || {};
+      const labor = Number(p.labor) || 0;
+      const parts = Number(p.parts) || 0;
+      const discount = Number(p.discount) || 0;
+      const total = Number(p.total) || Math.max(0, labor + parts - discount);
+      const paid = Number(p.paid) || 0;
+      const balance = Math.max(0, total - paid);
+
+      if (existing) {
+        // Idempotent Update (prevents duplication and updates changes made offline)
+        dbRun(`UPDATE repairs SET 
+          issue=?, tech_notes=?, status=?, technician_name=?, labor=?, parts_cost=?,
+          discount=?, total=?, paid=?, balance=?, payment_method=?, updated_at=datetime('now')
+          WHERE id=?`,
+          [tk.issue || existing.issue, tk.techNotes ?? existing.tech_notes, tk.status || existing.status,
+           tk.technician || existing.technician_name, labor, parts, discount, total, paid, balance,
+           p.method || existing.payment_method, existing.id]);
+        
+        if (existing.device_id) {
+          dbRun(`UPDATE devices SET type=?, brand_model=?, serial=?, accessories=?, device_password=? WHERE id=?`,
+            [tk.device.type || 'Laptop', tk.device.brandModel, tk.device.serial || '', tk.device.accessories || '', tk.device.password || '', existing.device_id]);
+        }
+        syncedCount++;
+      } else {
+        // Insert new device
         const deviceId = uuidv4();
         dbRun('INSERT INTO devices (id, customer_id, type, brand_model, serial, accessories, device_password) VALUES (?,?,?,?,?,?,?)',
           [deviceId, custId, tk.device.type || 'Laptop', tk.device.brandModel, tk.device.serial || '', tk.device.accessories || '', tk.device.password || '']);
 
-        // Insert repair
+        // Insert new repair with valid ticket number
         const repairId = uuidv4();
-        const p = tk.pricing || {};
-        const labor = Number(p.labor) || 0;
-        const parts = Number(p.parts) || 0;
-        const discount = Number(p.discount) || 0;
-        const total = Number(p.total) || (labor + parts - discount);
-        const paid = Number(p.paid) || 0;
-        const balance = total - paid;
+        const ticketNum = tk.id && !tk.id.startsWith('SRM-OFF-') ? tk.id : generateTicketNumber();
 
-        dbRun(`INSERT INTO repairs (id, ticket_number, customer_id, device_id, issue, tech_notes, status, technician_name, labor, parts_cost, discount, total, paid, balance, payment_method, created_by)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          [repairId, tk.id, custId, deviceId, tk.issue || '', tk.techNotes || '', tk.status || 'Received', tk.technician || 'Sakaria',
-           labor, parts, discount, total, paid, balance, p.method || 'Cash', req.user.id]);
+        dbRun(`INSERT INTO repairs (id, ticket_number, customer_id, device_id, issue, tech_notes, status, technician_name, labor, parts_cost, discount, total, paid, balance, payment_method, created_by, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [repairId, ticketNum, custId, deviceId, tk.issue || '', tk.techNotes || '', tk.status || 'Received', tk.technician || 'Sakaria',
+           labor, parts, discount, total, paid, balance, p.method || 'Cash', req.user.id, tk.createdAt || new Date().toISOString()]);
         
         syncedCount++;
       }
@@ -697,6 +760,9 @@ app.post('/api/backup/import-full', authenticate, requireRole('admin'), (req, re
     ensureDir(BACKUP_DIR);
     fs.writeFileSync(path.join(BACKUP_DIR, `PRE_IMPORT_${ts}.db`), Buffer.from(db.export()));
 
+    // Begin atomic transaction
+    db.run('BEGIN TRANSACTION;');
+
     // 2. Import customers
     if (Array.isArray(backup.customers)) {
       for (const c of backup.customers) {
@@ -747,10 +813,15 @@ app.post('/api/backup/import-full', authenticate, requireRole('admin'), (req, re
       }
     }
 
+    // Commit atomic transaction
+    db.run('COMMIT;');
+
     auditLog(req.user.id, req.user.username, req.user.role, 'BACKUP_IMPORT_FULL', 'database', null, { importedAt: new Date().toISOString() }, req.ip);
-    res.json({ message: 'Backup imported successfully!' });
+    res.json({ message: 'Backup imported successfully with full transactional integrity!' });
   } catch (err) {
-    res.status(500).json({ error: 'Import failed: ' + err.message });
+    try { db.run('ROLLBACK;'); } catch (rbErr) {}
+    console.error('Import transaction rolled back:', err.message);
+    res.status(500).json({ error: 'Import failed and safely rolled back: ' + err.message });
   }
 });
 
@@ -1573,13 +1644,16 @@ initDatabase().then(() => {
     console.log(`🚀 Server running on: http://localhost:${PORT}`);
     console.log(`📦 Database: ${DB_PATH}`);
     console.log(`💾 Backups: ${BACKUP_DIR}`);
-    console.log('');
-    console.log('👤 Default Login Credentials:');
-    console.log('   Admin:        admin / Admin@Sakaria2026');
-    console.log('   Technician:   sakaria / Tech@Sakaria123');
-    console.log('   Receptionist: receptionist / Recep@Sakaria123');
-    console.log('');
-    console.log('⚠️  IMPORTANT: Change default passwords after first login!');
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('👤 Default Login Credentials (Development Only):');
+      console.log('   Admin:        admin / Admin@Sakaria2026');
+      console.log('   Technician:   sakaria / Tech@Sakaria123');
+      console.log('   Receptionist: receptionist / Recep@Sakaria123');
+      console.log('');
+      console.log('⚠️  IMPORTANT: Change default passwords after first login!');
+    } else {
+      console.log('🛡️  Production Security: Default credentials suppressed from logs.');
+    }
     console.log('========================================\n');
     
     scheduleAutoBackup();

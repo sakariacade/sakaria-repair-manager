@@ -2,12 +2,21 @@ services:
   - type: web
     name: sakaria-repair-api
     env: node
+    plan: standard
     buildCommand: npm install
     startCommand: node backend.cjs
+    disk:
+      name: sakaria-db-disk
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: PORT
         value: 3001
       - key: NODE_ENV
         value: production
+      - key: DB_PATH
+        value: /var/data/sakaria.db
+      - key: BACKUP_DIR
+        value: /var/data/backups
       - key: JWT_SECRET
         generateValue: true
