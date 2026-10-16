@@ -47,9 +47,15 @@ const fs = require('fs');
 const path = require('path');
 const initSqlJs = require('sql.js');
 
+const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_change_me';
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('⚠️ WARNING: JWT_SECRET not set in environment! Generating secure ephemeral key.');
+  }
+  return crypto.randomBytes(64).toString('hex');
+})();
 const DB_PATH = process.env.DB_PATH || './data/sakaria.db';
 const BACKUP_DIR = process.env.BACKUP_DIR || './data/backups';
 
@@ -145,7 +151,11 @@ function saveDatabase() {
 }
 
 async function restoreDbFromGitHubCloudIfEmpty() {
-  const token = process.env.GITHUB_TOKEN || ['ghp_khpGhLL', 'gzEOm3ZYNG2j', '6MgrY7iXlVq3', '2EReB'].join('');
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    console.log('ℹ️ GITHUB_TOKEN not configured. Skipping automatic cloud restore.');
+    return false;
+  }
   const owner = process.env.GITHUB_REPO_OWNER || 'sakariacade';
   const repo = process.env.GITHUB_REPO_NAME || 'sakaria-repair-manager';
   const pathOnGit = 'data/backups/sakaria_cloud_backup.db';
@@ -1400,15 +1410,15 @@ app.post('/api/reset', authenticate, requireRole('admin'), (req, res) => {
 });
 
 // GitHub Cloud Auto Backup Helper
-const GITHUB_BACKUP_TOKEN = ['ghp_khpGhLL', 'gzEOm3ZYNG2j', '6MgrY7iXlVq3', '2EReB'].join('');
+const GITHUB_BACKUP_TOKEN = process.env.GITHUB_TOKEN;
 
 async function pushDbToGitHubCloud() {
   try {
-    if (!db) return false;
+    if (!db || !GITHUB_BACKUP_TOKEN) return false;
     const dbData = db.export();
     const base64Content = Buffer.from(dbData).toString('base64');
-    const owner = 'sakariacade';
-    const repo = 'sakaria-repair-manager';
+    const owner = process.env.GITHUB_REPO_OWNER || 'sakariacade';
+    const repo = process.env.GITHUB_REPO_NAME || 'sakaria-repair-manager';
     const pathOnGit = 'data/backups/sakaria_cloud_backup.db';
     
     const getUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${pathOnGit}`;
