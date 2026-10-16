@@ -543,7 +543,7 @@ export default function App() {
     const un = (loginForm.username || '').toLowerCase().trim();
     const pw = loginForm.password;
 
-    // 1. Try Online Backend Server API first
+    // Strict Server-Side Authentication
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
@@ -561,46 +561,21 @@ export default function App() {
         }
       } else {
         const err = await res.json().catch(() => ({}));
-        if (err.error && err.error.includes('Amni: Isku-dayo badan')) {
-          showToast(err.error, 'error');
-          playSound.error();
-          return;
-        }
+        showToast(err.error || (lang === 'so' ? 'Magaca ama Password-ka ma saxana!' : 'Invalid username or password!'), 'error');
+        playSound.error();
+        return;
       }
     } catch (err) {
-      // Backend offline or unreachable
-    }
-
-    // 2. Fallback Offline Login (Zero plaintext passwords: SHA-256 Hash Comparison)
-    const hashPw = async (str) => {
-      try {
-        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
-        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-      } catch (e) { return ''; }
-    };
-
-    const pwHash = await hashPw(pw);
-    let fallbackUser = null;
-    if (un === 'admin' && pwHash === '979ec2ad57cc25f9092b135ed3fb534aa54b144d22cb9d8f0cab7c0f9e590359') {
-      fallbackUser = { id: 1, username: 'admin', full_name: 'Admin (Sakaria Center)', role: 'admin' };
-    } else if (un === 'sakaria' && pwHash === 'cd9a1cb3b9855e64cb456e961269e17bac52af431e478a4a36347e766544eb7b') {
-      fallbackUser = { id: 2, username: 'sakaria', full_name: 'Sakaria Dheere', role: 'technician' };
-    } else if (un === 'cabdiraxmaan' && pwHash === 'cd9a1cb3b9855e64cb456e961269e17bac52af431e478a4a36347e766544eb7b') {
-      fallbackUser = { id: 3, username: 'cabdiraxmaan', full_name: 'Cabdiraxmaan', role: 'technician' };
-    } else if (un === 'receptionist' && pwHash === '505b23273e1d21a4476d6f365585ae1fe08df02dcf420e7be1f11fc8572c731a') {
-      fallbackUser = { id: 4, username: 'receptionist', full_name: 'Receptionist', role: 'receptionist' };
-    }
-
-    if (fallbackUser) {
-      const fallbackAuth = { token: 'fallback_token_' + Date.now(), user: fallbackUser };
-      setAuth(fallbackAuth);
-      localStorage.setItem('sakaria_auth', JSON.stringify(fallbackAuth));
-      showToast(lang === 'so' ? 'Waa lagalay (Offline Mode) ✅' : 'Logged in (Offline Mode) ✅', 'success');
-      playSound.success();
-    } else {
-      showToast(lang === 'so' ? 'Magaca ama Password-ka ma saxana!' : 'Invalid username or password!', 'error');
+      // Backend is offline or unreachable
+      showToast(lang === 'so' ? '⚠️ Server-ka lama xiriiri karo. Fadlan hubi inuu daaran yahay ama dooro Server kale.' : '⚠️ Server unreachable. Please verify server is running or switch Server URL.', 'error');
       playSound.error();
     }
+  };
+
+  const handleDemoLogin = () => {
+    const demoAuth = { token: 'demo_token_preview', user: { id: 'demo', username: 'demo', full_name: 'Guest / Demo Viewer', role: 'admin', isDemo: true } };
+    setAuth(demoAuth);
+    showToast(lang === 'so' ? 'Waa lagalay (Habka Tusaalaha / Demo Mode)' : 'Logged in (Demo Mode)', 'info');
   };
   
   const handleLogout = () => {
@@ -986,27 +961,158 @@ export default function App() {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${theme === 'dark' ? 'bg-slate-900 text-white' : 'bg-gray-50 text-slate-900'}`}>
         <div className={`w-full max-w-md p-8 rounded-2xl shadow-2xl ${theme === 'dark' ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-gray-100'}`}>
-          <div className="flex justify-center mb-6"><Wrench className="w-16 h-16 text-blue-500" /></div>
-          <h1 className="text-2xl font-bold text-center mb-8">{lang === 'so' ? 'Soo Gal System-ka' : 'Login to System'}</h1>
-          <form onSubmit={handleLogin} className="space-y-6">
+          
+          {/* Server Connection Banner */}
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-700">
+            <div className="flex items-center gap-2 text-xs">
+              <span className={`w-2.5 h-2.5 rounded-full ${dbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+              <span className="font-semibold">{dbConnected ? `Server: Online (${serverLatency || 20}ms)` : 'Server: Offline'}</span>
+            </div>
+            <button 
+              onClick={() => { setServerModalInput(serverUrl); setShowServerModal(true); }}
+              className="text-[11px] font-bold text-indigo-500 hover:text-indigo-600 flex items-center gap-1"
+            >
+              <Server className="w-3.5 h-3.5" />
+              <span>{lang === 'so' ? 'Dooro Server' : 'Server Settings'}</span>
+            </button>
+          </div>
+
+          <div className="flex justify-center mb-4"><Wrench className="w-16 h-16 text-blue-500" /></div>
+          <h1 className="text-2xl font-bold text-center mb-6">{lang === 'so' ? 'Soo Gal System-ka' : 'Login to System'}</h1>
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">{lang === 'so' ? 'Magaca' : 'Username'}</label>
+              <label className="block text-sm font-medium mb-1">{lang === 'so' ? 'Magaca' : 'Username'}</label>
               <input type="text" value={loginForm.username} onChange={e => setLoginForm({...loginForm, username: e.target.value})} className={`w-full p-3 rounded-lg ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'} border focus:ring-2 focus:ring-blue-500 outline-none`} required />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">{lang === 'so' ? 'Password-ka' : 'Password'}</label>
+              <label className="block text-sm font-medium mb-1">{lang === 'so' ? 'Password-ka' : 'Password'}</label>
               <input type="password" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} className={`w-full p-3 rounded-lg ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'} border focus:ring-2 focus:ring-blue-500 outline-none`} required />
             </div>
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors">
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors shadow-lg shadow-blue-500/25">
               {lang === 'so' ? 'Gudaha Gal' : 'Sign In'}
             </button>
           </form>
+
+          {/* Guest / Demo Mode Button */}
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 text-center">
+            <button 
+              onClick={handleDemoLogin}
+              className="text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-500 font-semibold"
+            >
+              {lang === 'so' ? '👀 Gal Habka Tusaalaha (Preview / Demo Mode)' : '👀 Enter Demo / Preview Mode'}
+            </button>
+          </div>
         </div>
+
+        {/* Server Modal if opened from login */}
+        {showServerModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-slate-200 dark:border-slate-700 animate-scale-up text-slate-900 dark:text-white">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700">
+                <div className="flex items-center gap-2">
+                  <Server className="w-5 h-5 text-indigo-500" />
+                  <h3 className="text-lg font-bold">{lang === 'so' ? '🌐 Xiriirka Server-ka' : '🌐 Server Connection'}</h3>
+                </div>
+                <button onClick={() => setShowServerModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="py-4 space-y-4 text-xs">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    {lang === 'so' ? 'Dooro Server (Quick Presets):' : 'Select Server Preset:'}
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => setServerModalInput('https://sakaria-repair-api.onrender.com/api')}
+                      className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 text-left transition flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50"
+                    >
+                      <Cloud className="w-4 h-4 text-blue-500 shrink-0" />
+                      <div>
+                        <div className="font-bold">☁️ Render Cloud API</div>
+                        <div className="text-[10px] text-slate-400">24/7 Online meel kasta</div>
+                      </div>
+                    </button>
+                    <button 
+                      onClick={() => setServerModalInput('/api')}
+                      className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 text-left transition flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50"
+                    >
+                      <Laptop className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <div>
+                        <div className="font-bold">💻 Localhost (Laptop)</div>
+                        <div className="text-[10px] text-slate-400">http://localhost:3001</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-1">
+                    {lang === 'so' ? 'Cinwaanka Server-ka (API Base URL):' : 'Server API Base URL:'}
+                  </label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={serverModalInput} 
+                      onChange={e => setServerModalInput(e.target.value)}
+                      placeholder="https://your-api.onrender.com/api ama /api"
+                      className="flex-1 p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button 
+                      onClick={async () => {
+                        showToast('Testing...', 'info');
+                        try {
+                          const s = performance.now();
+                          const r = await fetch(`${serverModalInput.trim().replace(/\/$/, '')}/health`, { signal: AbortSignal.timeout(4000) });
+                          const ms = Math.round(performance.now() - s);
+                          if (r.ok) {
+                            showToast(`✅ Server Online (${ms}ms)`, 'success');
+                          } else {
+                            showToast('❌ Status ' + r.status, 'error');
+                          }
+                        } catch(e) {
+                          showToast('❌ Unreachable', 'error');
+                        }
+                      }}
+                      className="px-3 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 rounded-xl font-bold text-xs"
+                    >
+                      Test
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                <button 
+                  onClick={() => {
+                    const clean = serverModalInput.trim().replace(/\/$/, '');
+                    setServerUrl(clean);
+                    localStorage.setItem('sakaria_server_url', clean);
+                    setShowServerModal(false);
+                    showToast('Server URL changed! ✅', 'success');
+                    setTimeout(() => { checkServerHealth(); }, 200);
+                  }}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition text-sm shadow-md"
+                >
+                  Save & Connect
+                </button>
+                <button 
+                  onClick={() => setShowServerModal(false)}
+                  className="px-4 py-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 rounded-xl font-bold text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Toasts */}
         <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
           {toasts.map(t => (
             <div key={t.id} className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-white animate-slide-up ${t.type === 'success' ? 'bg-emerald-500' : t.type === 'error' ? 'bg-red-500' : 'bg-blue-500'}`}>
-              {t.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+              {t.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <Shield className="w-5 h-5" />}
               <span className="font-medium">{t.message}</span>
             </div>
           ))}
